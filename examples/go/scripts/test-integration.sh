@@ -10,6 +10,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# IT-ORD-001, IT-ORD-002, IT-ORD-003, IT-ORD-004, IT-ORD-005, IT-ORD-006, IT-ORD-007, IT-ORD-008, IT-ORD-009, IT-ORD-010
 # Launch lightweight stub HTTP services and run real binary flow via Node fetch helper
 node -e '
 const http = require("node:http");

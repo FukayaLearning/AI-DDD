@@ -14,9 +14,14 @@
 - **Domain Ports (Interfaces)**: <!-- OrderRepository / ACL Ports owned by domain -->
 - **Error Modeling (`Result<T, E>`)**: <!-- Exhaustive DomainError variants (no domain exceptions) -->
 
-## 4-Layer Architecture & Infrastructure 3-Part Separation
+## 4-Layer Architecture, Module Layout & Infrastructure 3-Part Separation
 
 - **Dependency Rule**: `presentation -> application -> domain <- infrastructure`; `presentation` MUST NOT import `infrastructure`; `main` wires DI.
+- **Module-Subdivided Layer Layout** (no loose source files at layer roots; aggregate isolation inside `domain/`):
+  - `domain/shared/` (Shared Kernel: `Result`, base `DomainError`, shared VOs/IDs) & `domain/<aggregate>/`
+  - `application/shared/` (ACL ports, shared DTOs) & `application/<aggregate>/{commands,queries}/`
+  - `infrastructure/drivers/<technology>/`, `infrastructure/persistence/<aggregate>/`, `infrastructure/acl/<external-context>/`
+  - `presentation/<channel>/shared/`, `presentation/<channel>/<resource>/`, `presentation/<channel>/i18n/`
 - **Infrastructure Split**:
   1. **Pure Mappers & ACL Converters**: Side-effect free transformations (100% C1 unit-testable without mocks).
   2. **Minimal Drivers (`infrastructure/drivers/`)**: Raw DB/HTTP I/O ONLY. Zero `if`/`switch`/`match`/ternary business or error-mapping branches allowed.
