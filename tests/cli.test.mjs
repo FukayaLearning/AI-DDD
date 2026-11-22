@@ -202,3 +202,71 @@ function runShell(cmd, args, cwd) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
+
+// 6. Test init --locale ja, default en, and invalid locale rejection without writing files
+{
+  const jaDir = makeTempDir("ai-ddd-ja-");
+  try {
+    runNodeCli([
+      "init",
+      "--target", jaDir,
+      "--name", "billing-ctx",
+      "--context", "billing",
+      "--lang", "typescript",
+      "--dist", "binary",
+      "--locale", "ja",
+      "--yes",
+    ]);
+    const cfg = JSON.parse(fs.readFileSync(path.join(jaDir, "ai-ddd.config.json"), "utf8"));
+    assert.equal(cfg.schemaVersion, 2);
+    assert.equal(cfg.context.code, "BIL");
+    assert.equal(cfg.locale.master, "en");
+    assert.equal(cfg.locale.user, "ja");
+    const openspecCfg = fs.readFileSync(path.join(jaDir, "openspec", "config.yaml"), "utf8");
+    assert.match(openspecCfg, /Master=en, User=ja/);
+    const agentsText = fs.readFileSync(path.join(jaDir, "AGENTS.md"), "utf8");
+    assert.match(agentsText, /user locale is `ja`/);
+  } finally {
+    fs.rmSync(jaDir, { recursive: true, force: true });
+  }
+
+  const enDir = makeTempDir("ai-ddd-en-");
+  try {
+    runNodeCli([
+      "init",
+      "--target", enDir,
+      "--name", "orders-ctx",
+      "--context", "ordering",
+      "--context-code", "ORD",
+      "--lang", "typescript",
+      "--dist", "library",
+      "--yes",
+    ]);
+    const cfg = JSON.parse(fs.readFileSync(path.join(enDir, "ai-ddd.config.json"), "utf8"));
+    assert.equal(cfg.context.code, "ORD");
+    assert.equal(cfg.locale.master, "en");
+    assert.equal(cfg.locale.user, "en");
+  } finally {
+    fs.rmSync(enDir, { recursive: true, force: true });
+  }
+
+  const badDir = path.join(os.tmpdir(), `ai-ddd-bad-locale-${Date.now()}`);
+  let failed = false;
+  try {
+    runNodeCli([
+      "init",
+      "--target", badDir,
+      "--name", "bad-ctx",
+      "--context", "bad",
+      "--lang", "typescript",
+      "--dist", "library",
+      "--locale", "invalid_locale!",
+      "--yes",
+    ]);
+  } catch {
+    failed = true;
+  }
+  assert.ok(failed, "Expected invalid locale to fail");
+  assert.equal(fs.existsSync(badDir), false, "Expected no directory written on invalid locale");
+  console.log("PASS: init --locale ja, default en, and invalid locale rejection");
+}

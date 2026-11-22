@@ -2,6 +2,7 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { initProject, installSchema } from "./installer.js";
+import { deriveContextCode, normalizeLocale } from "./config.js";
 import { verifyProject } from "./verifier.js";
 
 const VALID_LANGS = new Set(["typescript", "python", "go", "rust"]);
@@ -19,8 +20,10 @@ Options for 'init':
   --target <dir>            Target repository path (default: .)
   --name <project-name>     Project name (default: directory basename)
   --context <name>          Single Bounded Context name in kebab-case
+  --context-code <code>     Short 2-5 letter prefix for REQ/SCN/UT/IT IDs
   --lang <language>         typescript | python | go | rust
   --dist <distribution>     docker | binary | library
+  --locale <bcp47>          User-facing locale (default: en)
   --tools <list>            AI tools CSV (default: antigravity,claude,hermes,github-copilot)
   --global-schema           Also install ddd-driven schema to XDG user OpenSpec schemas dir
   --yes, -y                 Non-interactive mode (use defaults for omitted flags)
@@ -77,8 +80,10 @@ async function promptMissingInitOptions(flags) {
 
   let projectName = flags.name;
   let contextName = flags.context;
+  let contextCode = flags["context-code"];
   let lang = flags.lang;
   let dist = flags.dist;
+  let locale = flags.locale;
   let globalSchema = Boolean(flags.globalSchema);
 
   if (canPrompt) {
@@ -112,6 +117,8 @@ async function promptMissingInitOptions(flags) {
 
   projectName = projectName || defaultName;
   contextName = toKebabCase(contextName || projectName);
+  contextCode = deriveContextCode(contextName, contextCode);
+  locale = normalizeLocale(locale || "en");
   lang = (lang || "typescript").toLowerCase();
   dist = (dist || "docker").toLowerCase();
 
@@ -133,6 +140,8 @@ async function promptMissingInitOptions(flags) {
     targetDir,
     projectName,
     contextName,
+    contextCode,
+    locale,
     lang,
     dist,
     tools,
@@ -161,7 +170,8 @@ export async function runCli(argv) {
       const result = initProject(opts);
       console.log(`Initialized OpenSpec + DDD project at ${result.targetDir}`);
       console.log(`  Language:     ${opts.lang}`);
-      console.log(`  Context:      ${opts.contextName}`);
+      console.log(`  Context:      ${opts.contextName} (${opts.contextCode})`);
+      console.log(`  Locale:       master=en, user=${opts.locale}`);
       console.log(`  Distribution: ${opts.dist}`);
       console.log(`  Schemas:      ${result.schemaPaths.join(", ")}`);
       console.log(`  Files:        ${result.filesCreated} skeleton files generated`);

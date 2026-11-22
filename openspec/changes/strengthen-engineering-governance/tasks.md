@@ -14,7 +14,7 @@
 
 ## 3. CLI: 設定・初期化
 
-- [ ] 3.1 `ai-ddd.config.json`（D1）の読込モジュールを追加し、`init` に `--locale`（BCP 47 検証、既定 `en`）と `--context-code`（既定は context 先頭 3 文字大文字）を追加、生成する `openspec/config.yaml` の context と `AGENTS.md` にロケール規約を記載する。`tests/cli.test.mjs` に「ja 初期化」「既定 en」「不正ロケールで exit 1・無書込」のテストを追加し `npm test` の CLI 部が成功することを確認する
+- [x] 3.1 `ai-ddd.config.json`（D1）の読込モジュールを追加し、`init` に `--locale`（BCP 47 検証、既定 `en`）と `--context-code`（既定は context 先頭 3 文字大文字）を追加、生成する `openspec/config.yaml` の context と `AGENTS.md` にロケール規約を記載する。`tests/cli.test.mjs` に「ja 初期化」「既定 en」「不正ロケールで exit 1・無書込」のテストを追加し `npm test` の CLI 部が成功することを確認する
 
 ## 4. CLI: 検証器拡張
 

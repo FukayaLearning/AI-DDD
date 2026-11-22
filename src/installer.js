@@ -3,6 +3,7 @@ import path from "node:path";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { buildProjectConfig, CONFIG_FILENAME } from "./config.js";
 import { generateSkeletonFiles } from "./skeletons.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -53,14 +54,19 @@ export function installSchema({ targetDir, globalSchema = false }) {
   return installedPaths;
 }
 
-export function buildOpenSpecConfig({ projectName, contextName, lang, dist }) {
+export function buildOpenSpecConfig({ projectName, contextName, contextCode, lang, dist, locale = "en" }) {
+  const i18nNote =
+    locale === "en"
+      ? `Master=en, User=en (English only)`
+      : `Master=en, User=${locale} (author English masters first; place change translations under i18n/${locale}/ and sibling <basename>.${locale}.md for persistent docs; Web UI renders in ${locale})`;
   return `schema: ddd-driven
 
 context: |
   Project: ${projectName}
-  Bounded Context: ${contextName} (1 repository = 1 Bounded Context; cross-repo OpenSpec linking is T.B.D.)
+  Bounded Context: ${contextName} (${contextCode}, 1 repository = 1 Bounded Context; cross-repo OpenSpec linking is T.B.D.)
   Language: ${lang}
   Distribution: ${dist}
+  Localization: ${i18nNote}
   Error Handling: Result<T, E> everywhere for expected domain and infrastructure failures
   Layer Architecture: Layer-first 4-layer DDD (domain, application, infrastructure, presentation) + main composition root
   Testing & Coverage:
@@ -94,7 +100,11 @@ operations:
 `;
 }
 
-export function buildAgentsMd({ projectName, contextName }) {
+export function buildAgentsMd({ projectName, contextName, locale = "en" }) {
+  const localeRule =
+    locale === "en"
+      ? `- **Localization**: Master and user locale are both \`en\`. Author all artifacts in English.`
+      : `- **Localization**: Master locale is \`en\` and user locale is \`${locale}\`. Author English masters first, maintain \`i18n/${locale}/\` translations for change artifacts and \`<basename>.${locale}.md\` for persistent docs (stamped via \`ai-ddd i18n stamp\`), and keep Web UI rendered in \`${locale}\`.`;
   return `# AGENTS.md — ${projectName} (${contextName} Bounded Context)
 
 ## 1. Mandatory Default: Route All Change Requests Through OpenSpec Skills
@@ -117,6 +127,7 @@ In this \`ddd-driven\` OpenSpec repository, **every user request that modifies f
 
 - **When implementation is requested without an active plan/task**: Do **not** edit target files directly. First run \`openspec-propose\` (for a new change) or \`openspec-update-change\` (to add/revise artifacts and tasks in an existing change), then execute \`openspec-apply-change\`.
 - **DDD Workflow Compliance**: Always follow \`.agents/skills/ddd-workflow/SKILL.md\` (1-Repo-1-Bounded-Context, 4-layer DDD, \`Result<T, E>\`, branchless \`infrastructure/drivers/\`, 100% C1 branch coverage outside exclusions, and 3-role multi-agent workflow).
+${localeRule}
 
 ---
 
@@ -145,14 +156,29 @@ export function initProject(options) {
     targetDir,
     projectName,
     contextName,
+    contextCode,
+    locale = "en",
     lang,
     dist,
     tools = SUPPORTED_TOOLS,
     globalSchema = false,
   } = options;
 
+  const projectConfig = buildProjectConfig({
+    contextName,
+    contextCode,
+    userLocale: locale,
+  });
+
   const absTarget = path.resolve(targetDir);
   fs.mkdirSync(absTarget, { recursive: true });
+
+  // Write ai-ddd.config.json
+  fs.writeFileSync(
+    path.join(absTarget, CONFIG_FILENAME),
+    JSON.stringify(projectConfig, null, 2) + "\n",
+    "utf8"
+  );
 
   // 1. Initialize git repository if missing
   if (!fs.existsSync(path.join(absTarget, ".git"))) {
@@ -174,7 +200,14 @@ export function initProject(options) {
   const configPath = path.join(absTarget, "openspec", "config.yaml");
   fs.writeFileSync(
     configPath,
-    buildOpenSpecConfig({ projectName, contextName, lang, dist }),
+    buildOpenSpecConfig({
+      projectName,
+      contextName,
+      contextCode: projectConfig.context.code,
+      lang,
+      dist,
+      locale: projectConfig.locale.user,
+    }),
     "utf8"
   );
 
@@ -193,7 +226,7 @@ export function initProject(options) {
   // 5b. Write root AGENTS.md enforcing OpenSpec skill routing & Git commit rules
   fs.writeFileSync(
     path.join(absTarget, "AGENTS.md"),
-    buildAgentsMd({ projectName, contextName }),
+    buildAgentsMd({ projectName, contextName, locale: projectConfig.locale.user }),
     "utf8"
   );
 
