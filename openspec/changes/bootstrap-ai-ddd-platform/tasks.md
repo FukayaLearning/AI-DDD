@@ -7,7 +7,7 @@
 
 ## 2. Node.js CLI Installer & Governance Verifier
 
-- [ ] 2.1 Implement `package.json`, `bin/ai-ddd.js`, `src/cli.js`, `src/installer.js`, `src/skeletons.js`, and `src/verifier.js` supporting `init` (interactive & flags, 4 languages, 3 distribution modes) and `verify`
+- [x] 2.1 Implement `package.json`, `bin/ai-ddd.js`, `src/cli.js`, `src/installer.js`, `src/skeletons.js`, and `src/verifier.js` supporting `init` (interactive & flags, 4 languages, 3 distribution modes) and `verify`
 - [ ] 2.2 Add CLI tests verifying `ai-ddd init` skeleton generation across languages/distributions and `ai-ddd verify` failure/pass cases
 
 ## 3. Reference Examples (`examples/{typescript,python,go,rust}/`)

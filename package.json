@@ -1,0 +1,16 @@
+{
+  "name": "ai-ddd",
+  "version": "0.1.0",
+  "description": "OpenSpec x DDD platform CLI, custom ddd-driven schema, AI skills, and 4-language reference examples",
+  "type": "module",
+  "bin": {
+    "ai-ddd": "./bin/ai-ddd.js"
+  },
+  "scripts": {
+    "test": "node tests/run-all.mjs",
+    "verify:examples": "node bin/ai-ddd.js verify --target examples/typescript && node bin/ai-ddd.js verify --target examples/python && node bin/ai-ddd.js verify --target examples/go && node bin/ai-ddd.js verify --target examples/rust"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
