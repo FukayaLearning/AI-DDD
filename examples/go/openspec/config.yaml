@@ -1,0 +1,35 @@
+schema: ddd-driven
+
+context: |
+  Project: ordering-go
+  Bounded Context: ordering (1 repository = 1 Bounded Context; cross-repo OpenSpec linking is T.B.D.)
+  Language: go
+  Distribution: binary
+  Error Handling: Result<T, E> everywhere for expected domain and infrastructure failures
+  Layer Architecture: Layer-first 4-layer DDD (domain, application, infrastructure, presentation) + main composition root
+  Testing & Coverage:
+    - Domain, Application, Infrastructure (excluding drivers/), Presentation (Mock + Playwright/Chromium) MUST reach 100% C1 branch coverage
+    - Only infrastructure/drivers/ and main may be excluded in centralized coverage config
+    - Inline coverage ignore comments are strictly forbidden
+    - infrastructure/drivers/ MUST remain branchless raw I/O
+    - Excluded drivers/ and main are verified via binary integration tests
+
+rules:
+  proposal:
+    - Confirm alignment with docs/domain/ubiquitous-language.md and docs/domain/context-map.md
+    - Name capabilities as ordering/<capability> in kebab-case
+  specs:
+    - Express all requirements in Ubiquitous Language without framework or SQL/HTTP details
+    - Map each #### Scenario 1-to-1 to Application UseCase and Presentation tests
+  design:
+    - Separate infrastructure into Pure Mappers/ACL, branchless drivers/, and DI Repositories/Gateways
+    - Explicitly list unit-test exclusions (drivers/ and main only) and integration verification steps
+  tasks:
+    - Order TDD strictly: Strategic Docs -> Domain (100% C1) -> Infra Mock-Driver Abnormal (100% C1) -> Application Scenarios (100% C1) -> Presentation Mock x Playwright (100% C1) -> Verify & Integration -> Zero-Context Review
+
+operations:
+  apply:
+    guidance:
+      - Main Agent owns spec authoring, 4-layer implementation, and test authoring in one continuous context
+      - Execution Subagent (lightweight model) runs builds, ai-ddd verify, unit+browser C1 tests, and integration tests
+      - Independent Review Subagent (high-capability model, ZERO prior conversation context) audits final files against OpenSpec and C1 governance

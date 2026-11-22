@@ -1,0 +1,156 @@
+package presentation
+
+import (
+	"fmt"
+	"html"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"example.com/ordering-go/internal/application"
+	"example.com/ordering-go/internal/domain"
+)
+
+func renderLayout(title, content string) string {
+	return fmt.Sprintf("<!doctype html><html lang='en'><head><meta charset='utf-8'><title>%s</title></head><body><main>%s</main></body></html>", html.EscapeString(title), content)
+}
+
+func RenderCreateOrderPage(err *domain.DomainError) string {
+	banner := ""
+	if err != nil {
+		banner = fmt.Sprintf("<div data-testid='error-banner'>%s: %s</div>", html.EscapeString(err.Code), html.EscapeString(err.Message))
+	}
+	return renderLayout("Place Order", fmt.Sprintf(`<h1>Place Order</h1>%s
+<form method="POST" action="/orders">
+  <input name="orderId" placeholder="Order ID" />
+  <input name="customerId" placeholder="Customer ID" />
+  <input name="productId" placeholder="Product ID" />
+  <input name="quantity" type="number" value="1" />
+  <input name="unitAmount" type="number" value="1000" />
+  <select name="currency"><option value="JPY">JPY</option><option value="USD">USD</option></select>
+  <button type="submit" data-testid="place-order-btn">Place Order</button>
+</form>`, banner))
+}
+
+func RenderOrderDetailPage(order application.OrderSummaryDto, err *domain.DomainError) string {
+	banner := ""
+	if err != nil {
+		banner = fmt.Sprintf("<div data-testid='error-banner'>%s: %s</div>", html.EscapeString(err.Code), html.EscapeString(err.Message))
+	}
+	var rows strings.Builder
+	for _, l := range order.Lines {
+		rows.WriteString(fmt.Sprintf("<tr><td>%s</td><td>%d</td><td>%d %s</td></tr>", html.EscapeString(l.ProductId), l.Quantity, l.UnitPrice.Amount, l.UnitPrice.Currency))
+	}
+	confirmDisabled := ""
+	if order.Status != domain.StatusDraft {
+		confirmDisabled = " disabled"
+	}
+	cancelDisabled := ""
+	if order.Status == domain.StatusCancelled {
+		cancelDisabled = " disabled"
+	}
+	oid := html.EscapeString(order.OrderId)
+	return renderLayout("Order "+order.OrderId, fmt.Sprintf(`<h1>Order %s</h1>%s
+<p>Customer: <span data-testid="customer-id">%s</span></p>
+<p>Status: <span data-testid="order-status">%s</span></p>
+<p>Total: <span data-testid="order-total">%d %s</span></p>
+<table><tbody data-testid="order-lines">%s</tbody></table>
+<form method="POST" action="/orders/%s/confirm"><button type="submit" data-testid="confirm-btn"%s>Confirm Order</button></form>
+<form method="POST" action="/orders/%s/cancel"><button type="submit" data-testid="cancel-btn"%s>Cancel Order</button></form>`,
+		oid, banner, html.EscapeString(order.CustomerId), order.Status, order.Total.Amount, order.Total.Currency, rows.String(), oid, confirmDisabled, oid, cancelDisabled))
+}
+
+func NewOrderWebHandler(useCases application.OrderUseCases) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if r.Method == http.MethodGet {
+			if r.URL.Path == "/" {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(RenderCreateOrderPage(nil)))
+				return
+			}
+			if strings.HasPrefix(r.URL.Path, "/orders/") && !strings.Contains(strings.TrimPrefix(r.URL.Path, "/orders/"), "/") {
+				orderId, _ := url.PathUnescape(strings.TrimPrefix(r.URL.Path, "/orders/"))
+				res := useCases.GetOrder(orderId)
+				if !res.Ok {
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write([]byte(renderLayout("Order Not Found", fmt.Sprintf("<div data-testid='error-banner'>%s: %s</div>", html.EscapeString(res.Error.Code), html.EscapeString(res.Error.Message)))))
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(RenderOrderDetailPage(res.Value, nil)))
+				return
+			}
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(renderLayout("Not Found", "<p data-testid='not-found'>Page Not Found</p>")))
+			return
+		}
+
+		if r.Method == http.MethodPost {
+			if r.URL.Path == "/orders" {
+				_ = r.ParseForm()
+				qty, _ := strconv.Atoi(r.FormValue("quantity"))
+				amt, _ := strconv.ParseInt(r.FormValue("unitAmount"), 10, 64)
+				res := useCases.PlaceOrder(application.PlaceOrderCommand{
+					OrderId:    r.FormValue("orderId"),
+					CustomerId: r.FormValue("customerId"),
+					Lines: []application.PlaceOrderLineInput{{
+						ProductId:  r.FormValue("productId"),
+						Quantity:   qty,
+						UnitAmount: amt,
+						Currency:   domain.Currency(r.FormValue("currency")),
+					}},
+				})
+				if !res.Ok {
+					w.WriteHeader(http.StatusUnprocessableEntity)
+					_, _ = w.Write([]byte(RenderCreateOrderPage(res.Error)))
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(RenderOrderDetailPage(res.Value, nil)))
+				return
+			}
+			if strings.HasPrefix(r.URL.Path, "/orders/") && strings.HasSuffix(r.URL.Path, "/confirm") {
+				rawId := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/orders/"), "/confirm")
+				orderId, _ := url.PathUnescape(rawId)
+				res := useCases.ConfirmOrder(orderId)
+				if !res.Ok {
+					cur := useCases.GetOrder(orderId)
+					if !cur.Ok {
+						w.WriteHeader(http.StatusNotFound)
+						_, _ = w.Write([]byte(renderLayout("Order Not Found", fmt.Sprintf("<div data-testid='error-banner'>%s: %s</div>", html.EscapeString(res.Error.Code), html.EscapeString(res.Error.Message)))))
+						return
+					}
+					w.WriteHeader(http.StatusUnprocessableEntity)
+					_, _ = w.Write([]byte(RenderOrderDetailPage(cur.Value, res.Error)))
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(RenderOrderDetailPage(res.Value, nil)))
+				return
+			}
+			if strings.HasPrefix(r.URL.Path, "/orders/") && strings.HasSuffix(r.URL.Path, "/cancel") {
+				rawId := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/orders/"), "/cancel")
+				orderId, _ := url.PathUnescape(rawId)
+				res := useCases.CancelOrder(orderId)
+				if !res.Ok {
+					cur := useCases.GetOrder(orderId)
+					if !cur.Ok {
+						w.WriteHeader(http.StatusNotFound)
+						_, _ = w.Write([]byte(renderLayout("Order Not Found", fmt.Sprintf("<div data-testid='error-banner'>%s: %s</div>", html.EscapeString(res.Error.Code), html.EscapeString(res.Error.Message)))))
+						return
+					}
+					w.WriteHeader(http.StatusUnprocessableEntity)
+					_, _ = w.Write([]byte(RenderOrderDetailPage(cur.Value, res.Error)))
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(RenderOrderDetailPage(res.Value, nil)))
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(renderLayout("Not Found", "<p data-testid='not-found'>Page Not Found</p>")))
+	})
+}

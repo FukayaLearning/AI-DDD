@@ -14,7 +14,7 @@
 
 - [x] 3.1 Implement Ordering Context OpenSpec + 4-layer DDD + 100% C1 + Mock×Chromium browser UI + integration test in `examples/typescript/` and verify all tests pass
 - [x] 3.2 Implement Ordering Context OpenSpec + 4-layer DDD + 100% C1 + Mock×Chromium browser UI + integration test in `examples/python/` and verify all tests pass
-- [ ] 3.3 Implement Ordering Context OpenSpec + 4-layer DDD + 100% C1 + Mock×Playwright + integration test in `examples/go/` and verify governance checks pass
+- [x] 3.3 Implement Ordering Context OpenSpec + 4-layer DDD + 100% C1 + Mock×Playwright + integration test in `examples/go/` and verify governance checks pass
 - [ ] 3.4 Implement Ordering Context OpenSpec + 4-layer DDD + 100% C1 + Mock×Chromium browser UI + integration test in `examples/rust/` and verify `cargo test --offline` and governance checks pass
 
 ## 4. End-to-End Platform Verification
