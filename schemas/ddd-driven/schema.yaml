@@ -25,6 +25,9 @@ artifacts:
 
       Every change must either declare at least one capability or set `skip_specs: true` in `.openspec.yaml`.
       Research existing specs first with `openspec list --specs` and `openspec show "<spec-id>" --type spec`.
+
+      Localization Rule (Master = `en`):
+      - Author `proposal.md` in English first. If `ai-ddd.config.json` sets `locale.user` != `en`, also create `i18n/<locale>/proposal.md` stamped with `ai-ddd i18n stamp`.
     requires: []
 
   - id: specs
@@ -41,9 +44,13 @@ artifacts:
       Formatting rules (required for `openspec validate --strict`):
       - New capabilities MUST start with `## Purpose` (50+ characters). Do NOT include `## Purpose` for modified capabilities.
       - Use delta headers: `## ADDED Requirements`, `## MODIFIED Requirements`, `## REMOVED Requirements`, `## RENAMED Requirements`.
-      - Each requirement: `### Requirement: <name>` using SHALL/MUST (keep description <= 500 chars).
-      - Each scenario MUST use exactly 4 hashtags (`#### Scenario: <name>`) with `- **GIVEN**`/`- **WHEN**` and `- **THEN**` steps.
+      - Each requirement: `### Requirement: REQ-<CTX>-<NNN> <name>` using SHALL/MUST (keep description <= 500 chars).
+      - Each scenario MUST use exactly 4 hashtags (`#### Scenario: SCN-<CTX>-<NNN>-<NN> <name>`) with `- **GIVEN**`/`- **WHEN**` and `- **THEN**` steps.
+      - Never reuse retired IDs.
       - Avoid internal class names, framework names, or SQL/HTTP details in specs; keep specs behavior-focused and testable.
+
+      Localization Rule (Master = `en`):
+      - Author `specs/<bounded-context>/<capability>/spec.md` in English. If `locale.user` != `en`, place translation at `i18n/<locale>/specs/<bounded-context>/<capability>/spec.md` (never as a sibling inside `specs/`, which OpenSpec rejects) and stamp it.
     requires:
       - proposal
 
@@ -76,6 +83,9 @@ artifacts:
          - Everything outside exclusions MUST achieve **100% C1 (branch) coverage**.
       5. **Distribution & Integration Test Plan**:
          - State distribution target (`docker`, `binary`, or `library`) and how excluded `infrastructure/drivers/` and `main` are verified in integration tests.
+      6. **Module-Subdivided Layer Layout & Localization**:
+         - Subdivide layers into `domain/{shared,<agg>}`, `application/{shared,<agg>/{commands,queries}}`, `infrastructure/{drivers/<tech>,persistence/<agg>,acl/<ext>}`, `presentation/<channel>/{shared,<res>,i18n}`.
+         - If `locale.user` != `en`, translate `design.md` to `i18n/<locale>/design.md` and stamp it.
     requires:
       - proposal
 
@@ -94,6 +104,7 @@ artifacts:
       - **Non-Functional Testing**: Whether performance/security/availability tests are needed, with rationale.
       - **Abnormal-Path Checklist**: Per capability, address every category with IT case IDs or an explicit N/A reason.
       - **Test Case Delta**: UT/IT IDs added, changed, or retired by this change, each tracing to `REQ-`/`SCN-` IDs or design elements.
+      - **Localization**: If `locale.user` != `en`, translate `test-plan.md` to `i18n/<locale>/test-plan.md` and stamp it.
     requires:
       - specs
       - design
