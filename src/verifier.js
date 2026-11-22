@@ -1,6 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { DEFAULT_MAX_FILES_PER_DIR, loadProjectConfig } from "./config.js";
+import { verifyTranslations, verifyUiCatalogs } from "./i18n.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PLATFORM_SCHEMA_PATH = path.resolve(__dirname, "..", "schemas", "ddd-driven", "schema.yaml");
+
+function readSchemaVersion(schemaYamlPath) {
+  if (!fs.existsSync(schemaYamlPath)) return null;
+  const text = fs.readFileSync(schemaYamlPath, "utf8");
+  const m = text.match(/^version:\s*(\d+)\s*$/m);
+  return m ? Number(m[1]) : null;
+}
 
 const INLINE_IGNORE_PATTERNS = [
   { name: "istanbul ignore", regex: /istanbul\s+ignore/i },
@@ -321,7 +333,11 @@ export function verifyProject(targetDir) {
   const warnings = [];
 
   if (!fs.existsSync(absTarget)) {
-    return {
+    // 4. Translations & UI message catalogs
+  v2Sink.push(...verifyTranslations(absTarget, userLocale));
+  v2Sink.push(...verifyUiCatalogs(absTarget, userLocale));
+
+  return {
       ok: false,
       target: absTarget,
       errors: [`Target directory does not exist: ${absTarget}`],
@@ -350,8 +366,22 @@ export function verifyProject(targetDir) {
   if (loadedCfg.error) {
     errors.push(`Invalid ${path.basename(loadedCfg.path)}: ${loadedCfg.error}`);
   }
+  const projectSchemaVersion = loadedCfg.exists ? (loadedCfg.config?.schemaVersion ?? 1) : 1;
+  const strictV2 = projectSchemaVersion >= 2;
+  const v2Sink = strictV2 ? errors : warnings;
   const maxFilesPerDir =
     loadedCfg.config?.structure?.maxFilesPerDirectory ?? DEFAULT_MAX_FILES_PER_DIR;
+  const userLocale = loadedCfg.config?.locale?.user ?? "en";
+
+  const currentSchemaVer = readSchemaVersion(PLATFORM_SCHEMA_PATH) ?? 2;
+  const targetSchemaVer = readSchemaVersion(
+    path.join(absTarget, "openspec", "schemas", "ddd-driven", "schema.yaml")
+  );
+  if (targetSchemaVer !== null && targetSchemaVer < currentSchemaVer) {
+    warnings.push(
+      `[Outdated Schema] openspec/schemas/ddd-driven/schema.yaml is version ${targetSchemaVer} (current: ${currentSchemaVer}); run 'ai-ddd install-schema --target .' to update`
+    );
+  }
 
   // 2. Scan source files
   const allFiles = walkFiles(absTarget);
@@ -380,13 +410,13 @@ export function verifyProject(targetDir) {
     const subpath = detectLayerSubpath(rel);
     if (subpath && SUBDIVIDED_LAYERS.has(subpath.layer)) {
       if (subpath.isLooseRootFile && !MODULE_DECLARATION_FILES.has(path.posix.basename(rel))) {
-        errors.push(
+        v2Sink.push(
           `[Loose Layer File] ${rel} (layer '${subpath.layer}'): place source files inside a module subdirectory (e.g., ${subpath.layer}/shared/ or ${subpath.layer}/<module>/)`
         );
       }
       if (subpath.layer === "domain") {
         for (const otherAgg of extractDomainAggregateDeps(content, ext, rel)) {
-          errors.push(
+          v2Sink.push(
             `[Aggregate Isolation Violation] ${rel}: domain/${subpath.moduleName}/ MUST NOT depend on domain/${otherAgg}/ (reference via IDs in domain/shared/)`
           );
         }
@@ -453,6 +483,10 @@ export function verifyProject(targetDir) {
       errors.push(`Invalid JSON in c1-coverage.config.json: ${e.message}`);
     }
   }
+
+  // 4. Translations & UI message catalogs
+  v2Sink.push(...verifyTranslations(absTarget, userLocale));
+  v2Sink.push(...verifyUiCatalogs(absTarget, userLocale));
 
   return {
     ok: errors.length === 0,
