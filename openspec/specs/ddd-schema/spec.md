@@ -5,14 +5,6 @@ Defines the `ddd-driven` OpenSpec custom schema, templates, strategic DDD docume
 
 ## Requirements
 
-### Requirement: Four-stage DDD-enriched OpenSpec schema
-The `ddd-driven` schema SHALL preserve OpenSpec's four-stage artifact graph (`proposal`, `specs`, `design`, `tasks`) while embedding DDD strategic and tactical requirements into artifact instructions and templates.
-
-#### Scenario: Schema validates cleanly with OpenSpec CLI
-- **GIVEN** the `ddd-driven` schema directory under `schemas/ddd-driven/` or a target repository's `openspec/schemas/ddd-driven/`
-- **WHEN** `openspec schema validate ddd-driven` is executed
-- **THEN** OpenSpec reports the schema and all four templates (`proposal.md`, `spec.md`, `design.md`, `tasks.md`) as valid
-
 ### Requirement: Strategic DDD knowledge management
 The `ddd-driven` schema SHALL organize specifications under `openspec/specs/<bounded-context>/<capability>/spec.md` for a single Bounded Context per repository and require synchronization with `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md`.
 
@@ -26,8 +18,8 @@ The `ddd-driven` schema SHALL enforce explicit identification of unit-test exclu
 
 #### Scenario: Design template documents test exclusions and tactical artifacts
 - **GIVEN** a change created under `ddd-driven`
-- **WHEN** `design.md` and `tasks.md` are generated from schema templates
-- **THEN** `design.md` includes sections for Domain Model, 4-Layer Architecture, Infrastructure 3-part separation, Unit-Test Exclusions, and Integration Test Plan, and `tasks.md` sequences Domain TDD, Infrastructure abnormal-path TDD, Application Scenario TDD, Presentation Mock+Browser TDD, Integration Test, and Zero-Context Review
+- **WHEN** `design.md`, `test-plan.md`, and `tasks.md` are generated from schema templates
+- **THEN** `design.md` includes sections for Domain Model, 4-Layer Architecture with module layout, Infrastructure 3-part separation, and Unit-Test Exclusions, `test-plan.md` includes Test Scope, Test Levels, Environment, Entry/Exit Criteria, Abnormal-Path Checklist, and Test Case Delta, and `tasks.md` sequences Test Specification authoring, Domain TDD, Infrastructure abnormal-path TDD, Application Scenario TDD, Presentation Mock+Browser TDD, Integration Test, Traceability Check, Translation Sync, and Zero-Context Review
 
 ### Requirement: Git branch and per-task commit workflow during apply
 When the target project is under Git version control, the `ddd-driven` schema and `ddd-workflow` skill SHALL instruct `openspec-apply` to consult the user on working-branch creation and commit post-propose planning artifacts before the first task, and create one commit per completed task; non-Git projects SHALL omit these Git steps.
@@ -44,3 +36,32 @@ The repository root and `ai-ddd init` generated projects SHALL provide an `AGENT
 - **GIVEN** a repository containing the generated or root `AGENTS.md`
 - **WHEN** a user requests a code or documentation change without naming an OpenSpec skill or explicitly opting out
 - **THEN** the agent routes the request through the matching OpenSpec skill workflow and performs direct file edits without OpenSpec only upon an explicit user opt-out instruction
+
+### Requirement: Five-stage DDD-enriched OpenSpec schema with test planning
+`ddd-driven` スキーマは `proposal`、`specs`、`design`、`test-plan`、`tasks` の 5 段階成果物グラフを定義 SHALL する。`test-plan` は `specs` と `design` に依存し、`tasks` は `specs`・`design`・`test-plan` に依存 MUST する。DDD の戦略・戦術要件と試験計画要件を成果物の instruction とテンプレートに組み込む。
+
+#### Scenario: Schema validates cleanly with OpenSpec CLI
+- **GIVEN** `schemas/ddd-driven/` またはターゲットリポジトリの `openspec/schemas/ddd-driven/` にあるスキーマ
+- **WHEN** `openspec schema validate ddd-driven` を実行する
+- **THEN** OpenSpec はスキーマと 5 つのテンプレート（`proposal.md`、`spec.md`、`design.md`、`test-plan.md`、`tasks.md`）を有効と報告する
+
+#### Scenario: Artifact dependency order includes test planning
+- **GIVEN** `ddd-driven` で作成した新規変更
+- **WHEN** `openspec status --change <name> --json` を実行する
+- **THEN** `test-plan` の依存は `specs` と `design`、`tasks` の依存は `specs`・`design`・`test-plan` として報告される
+
+### Requirement: Schema versioning
+`ddd-driven` スキーマは互換性のない成果物グラフ・テンプレート変更のたびにバージョン番号を増分 SHALL し、本変更でバージョン `2` とする。`ai-ddd verify` はターゲットに配置されたスキーマのバージョンが CLI 同梱版より古い場合に警告 SHALL する。
+
+#### Scenario: Outdated schema copy in a target project
+- **GIVEN** スキーマ `version: 1` が配置されたターゲットプロジェクト
+- **WHEN** CLI 同梱スキーマが `version: 2` の `ai-ddd verify --target <dir>` を実行する
+- **THEN** 古いスキーマバージョンと `ai-ddd install-schema` による更新方法が警告として出力される
+
+### Requirement: Language, structure, and traceability conventions in templates
+`ddd-driven` のテンプレートと `ddd-workflow` スキルは、英語マスター＋ユーザー言語翻訳の作成規約、層内モジュール細分化規約、`REQ`/`SCN`/`UT`/`IT` の ID 記法を明示 SHALL する。
+
+#### Scenario: Templates show identifier notation
+- **GIVEN** `ddd-driven` スキーマで生成した `spec.md` と `test-plan.md` のテンプレート
+- **WHEN** テンプレートを参照する
+- **THEN** `### Requirement: REQ-<CTX>-<NNN> ...`、`#### Scenario: SCN-<CTX>-<NNN>-<NN> ...`、`UT-<CTX>-<NNN>`、`IT-<CTX>-<NNN>` の記法例が含まれる
