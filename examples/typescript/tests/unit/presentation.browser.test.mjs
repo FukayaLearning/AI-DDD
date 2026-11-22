@@ -4,7 +4,12 @@ import { err, ok } from "../../src/domain/shared/result.ts";
 import { startOrderWebServer } from "../../src/presentation/web/order/order_web_server.ts";
 import { launchHeadlessBrowser } from "../../scripts/browser-helper.mjs";
 
-export async function run() {
+const cases = [];
+function test(name, fn) {
+  cases.push({ name, fn });
+}
+
+test("UT-ORD-027 UT-ORD-028 UT-ORD-029 UT-ORD-030 presentation browser lifecycle and error views", async () => {
   const dtoDraft = {
     orderId: "ORD-WEB-1",
     customerId: "CUST-9",
@@ -107,4 +112,8 @@ export async function run() {
     await browser.close();
     await close();
   }
+});
+
+export async function run() {
+  for (const c of cases) await c.fn();
 }

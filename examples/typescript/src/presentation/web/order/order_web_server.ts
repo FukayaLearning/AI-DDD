@@ -82,6 +82,7 @@ function sendHtml(res: http.ServerResponse, status: number, html: string): void 
   res.end(html);
 }
 
+// @implements REQ-ORD-004
 export function createOrderWebHandler(useCases: OrderUseCases) {
   return async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const method = req.method as string;

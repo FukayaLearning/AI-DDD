@@ -70,6 +70,7 @@ export class OrderApplicationService implements OrderUseCases {
     this.payment = payment;
   }
 
+  // @implements REQ-ORD-001
   async placeOrder(cmd: PlaceOrderCommand): Promise<Result<OrderSummaryDto, DomainError>> {
     const idRes = createOrderId(cmd.orderId);
     if (!idRes.ok) return err(idRes.error);
@@ -100,6 +101,7 @@ export class OrderApplicationService implements OrderUseCases {
     return ok(toDto(orderRes.value));
   }
 
+  // @implements REQ-ORD-002
   async confirmOrder(rawOrderId: string): Promise<Result<OrderSummaryDto, DomainError>> {
     const idRes = createOrderId(rawOrderId);
     if (!idRes.ok) return err(idRes.error);
@@ -123,6 +125,7 @@ export class OrderApplicationService implements OrderUseCases {
     return ok(toDto(confirmedPreview.value));
   }
 
+  // @implements REQ-ORD-003
   async cancelOrder(rawOrderId: string): Promise<Result<OrderSummaryDto, DomainError>> {
     const idRes = createOrderId(rawOrderId);
     if (!idRes.ok) return err(idRes.error);
