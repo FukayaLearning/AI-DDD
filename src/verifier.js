@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_MAX_FILES_PER_DIR, loadProjectConfig } from "./config.js";
 import { verifyTranslations, verifyUiCatalogs } from "./i18n.js";
+import { analyzeTraceability } from "./tracer.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLATFORM_SCHEMA_PATH = path.resolve(__dirname, "..", "schemas", "ddd-driven", "schema.yaml");
@@ -333,11 +334,7 @@ export function verifyProject(targetDir) {
   const warnings = [];
 
   if (!fs.existsSync(absTarget)) {
-    // 4. Translations & UI message catalogs
-  v2Sink.push(...verifyTranslations(absTarget, userLocale));
-  v2Sink.push(...verifyUiCatalogs(absTarget, userLocale));
-
-  return {
+    return {
       ok: false,
       target: absTarget,
       errors: [`Target directory does not exist: ${absTarget}`],
@@ -487,6 +484,10 @@ export function verifyProject(targetDir) {
   // 4. Translations & UI message catalogs
   v2Sink.push(...verifyTranslations(absTarget, userLocale));
   v2Sink.push(...verifyUiCatalogs(absTarget, userLocale));
+
+  // 5. Traceability check
+  const traceReport = analyzeTraceability(absTarget);
+  v2Sink.push(...traceReport.errors);
 
   return {
     ok: errors.length === 0,

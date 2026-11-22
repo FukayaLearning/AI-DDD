@@ -4,6 +4,7 @@ import { stdin as input, stdout as output } from "node:process";
 import { initProject, installSchema } from "./installer.js";
 import { deriveContextCode, normalizeLocale } from "./config.js";
 import { stampTranslationFile } from "./i18n.js";
+import { analyzeTraceability, writeTraceabilityMatrix } from "./tracer.js";
 import { verifyProject } from "./verifier.js";
 
 const VALID_LANGS = new Set(["typescript", "python", "go", "rust"]);
@@ -15,6 +16,7 @@ function printHelp() {
 Usage:
   ai-ddd init [options]             Initialize a repository with ddd-driven OpenSpec + clean 4-layer DDD skeleton
   ai-ddd verify [options]           Verify layer dependencies, structure, i18n, test specs, and drivers/
+  ai-ddd trace [options]            Generate traceability matrix and optionally verify coverage gaps
   ai-ddd i18n stamp [options] <file> Stamp a translation file with its master SHA-256 hash
   ai-ddd install-schema [options]   Deploy or update the ddd-driven OpenSpec schema
 
@@ -34,6 +36,12 @@ Options for 'verify':
   --target <dir>            Target repository path (default: .)
   --json                    Print JSON output
 
+Options for 'trace':
+  --target <dir>            Target repository path (default: .)
+  --check                   Fail with exit code 1 if any traceability gap or orphan exists
+  --format <markdown|json>  Output format (default: markdown written to docs/traceability/matrix.md)
+  --include-changes         Also include active openspec/changes/*/specs/ in analysis
+
 Options for 'install-schema':
   --target <dir>            Target repository path (default: .)
   --global                  Install into XDG user OpenSpec schemas dir
@@ -52,6 +60,10 @@ function parseFlags(args) {
       flags.globalSchema = true;
     } else if (token === "--json") {
       flags.json = true;
+    } else if (token === "--check") {
+      flags.check = true;
+    } else if (token === "--include-changes") {
+      flags.includeChanges = true;
     } else if (token.startsWith("--")) {
       const key = token.slice(2);
       const val = args[i + 1];
@@ -206,6 +218,31 @@ export async function runCli(argv) {
       }
     }
     return report.ok ? 0 : 1;
+  }
+
+  if (command === "trace") {
+    const targetDir = flags.target || ".";
+    const format = flags.format || "markdown";
+    const report = analyzeTraceability(targetDir, {
+      includeChanges: Boolean(flags.includeChanges),
+    });
+    if (format === "json") {
+      console.log(JSON.stringify(report, null, 2));
+    } else {
+      const outPath = writeTraceabilityMatrix(targetDir, report);
+      console.log(
+        `Generated ${outPath} (${report.summary.requirements} REQ, ${report.summary.scenarios} SCN, ${report.summary.testCases} cases)`
+      );
+      if (!report.ok) {
+        for (const err of report.errors) {
+          console.error(`  - ${err}`);
+        }
+      }
+    }
+    if (flags.check && !report.ok) {
+      return 1;
+    }
+    return 0;
   }
 
   if (command === "i18n") {
