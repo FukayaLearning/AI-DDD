@@ -12,6 +12,11 @@ from src.domain.shared.value_objects import Currency
 from src.presentation.web.i18n.en import MESSAGES as EN_MESSAGES
 
 
+def _localize_error(messages: dict, error: DomainError) -> str:
+    localized = messages.get("errorMessages", {})
+    return localized.get(error.code, error.message)
+
+
 def _layout(locale: str, title: str, content: str) -> str:
     return f"<!doctype html><html lang='{escape(locale)}'><head><meta charset='utf-8'><title>{escape(title)}</title></head><body><main>{content}</main></body></html>"
 
@@ -19,7 +24,7 @@ def _layout(locale: str, title: str, content: str) -> str:
 def render_create_order_page(error: DomainError | None, messages: dict[str, str] = EN_MESSAGES) -> str:
     banner = ""
     if error is not None:
-        banner = f"<div data-testid='error-banner'>{escape(error.code)}: {escape(error.message)}</div>"
+        banner = f"<div data-testid='error-banner'>{escape(error.code)}: {escape(_localize_error(messages, error))}</div>"
     return _layout(
         messages["locale"],
         messages["placeOrderTitle"],
@@ -44,7 +49,7 @@ def render_order_detail_page(
 ) -> str:
     banner = ""
     if error is not None:
-        banner = f"<div data-testid='error-banner'>{escape(error.code)}: {escape(error.message)}</div>"
+        banner = f"<div data-testid='error-banner'>{escape(error.code)}: {escape(_localize_error(messages, error))}</div>"
     rows = "".join(
         f"<tr><td>{escape(l.product_id)}</td><td>{l.quantity}</td><td>{l.unit_price.amount} {l.unit_price.currency}</td></tr>"
         for l in order.lines
@@ -90,7 +95,7 @@ def dispatch_request(
                     _layout(
                         messages["locale"],
                         messages["orderNotFoundTitle"],
-                        f"<div data-testid='error-banner'>{escape(res.error.code)}: {escape(res.error.message)}</div>",
+                        f"<div data-testid='error-banner'>{escape(res.error.code)}: {escape(_localize_error(messages, res.error))}</div>",
                     ),
                 )
             return (200, render_order_detail_page(res.value, None, messages))
@@ -131,7 +136,7 @@ def dispatch_request(
                         _layout(
                             messages["locale"],
                             messages["orderNotFoundTitle"],
-                            f"<div data-testid='error-banner'>{escape(res.error.code)}: {escape(res.error.message)}</div>",
+                            f"<div data-testid='error-banner'>{escape(res.error.code)}: {escape(_localize_error(messages, res.error))}</div>",
                         ),
                     )
                 return (422, render_order_detail_page(cur.value, res.error, messages))
@@ -149,7 +154,7 @@ def dispatch_request(
                         _layout(
                             messages["locale"],
                             messages["orderNotFoundTitle"],
-                            f"<div data-testid='error-banner'>{escape(res.error.code)}: {escape(res.error.message)}</div>",
+                            f"<div data-testid='error-banner'>{escape(res.error.code)}: {escape(_localize_error(messages, res.error))}</div>",
                         ),
                     )
                 return (422, render_order_detail_page(cur.value, res.error, messages))

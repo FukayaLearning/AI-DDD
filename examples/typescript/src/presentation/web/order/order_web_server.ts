@@ -12,6 +12,10 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function localizeError(messages: OrderMessages, error: DomainError): string {
+  return messages.errorMessages[error.code] ?? error.message;
+}
+
 function layout(locale: string, title: string, content: string): string {
   return `<!doctype html>
 <html lang="${escapeHtml(locale)}">
@@ -22,7 +26,7 @@ function layout(locale: string, title: string, content: string): string {
 
 export function renderCreateOrderPage(error: DomainError | null, messages: OrderMessages = enMessages): string {
   const banner = error
-    ? `<div data-testid="error-banner">${escapeHtml(error.code)}: ${escapeHtml(error.message)}</div>`
+    ? `<div data-testid="error-banner">${escapeHtml(error.code)}: ${escapeHtml(localizeError(messages, error))}</div>`
     : "";
   return layout(
     messages.locale,
@@ -47,7 +51,7 @@ export function renderOrderDetailPage(
   messages: OrderMessages = enMessages
 ): string {
   const banner = error
-    ? `<div data-testid="error-banner">${escapeHtml(error.code)}: ${escapeHtml(error.message)}</div>`
+    ? `<div data-testid="error-banner">${escapeHtml(error.code)}: ${escapeHtml(localizeError(messages, error))}</div>`
     : "";
   const linesHtml = order.lines
     .map(
@@ -110,7 +114,7 @@ export function createOrderWebHandler(useCases: OrderUseCases, messages: OrderMe
             layout(
               messages.locale,
               messages.orderNotFoundTitle,
-              `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(result.error.message)}</div>`
+              `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(localizeError(messages, result.error))}</div>`
             )
           );
           return;
@@ -158,7 +162,7 @@ export function createOrderWebHandler(useCases: OrderUseCases, messages: OrderMe
               layout(
                 messages.locale,
                 messages.orderNotFoundTitle,
-                `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(result.error.message)}</div>`
+                `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(localizeError(messages, result.error))}</div>`
               )
             );
             return;
@@ -183,7 +187,7 @@ export function createOrderWebHandler(useCases: OrderUseCases, messages: OrderMe
               layout(
                 messages.locale,
                 messages.orderNotFoundTitle,
-                `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(result.error.message)}</div>`
+                `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(localizeError(messages, result.error))}</div>`
               )
             );
             return;

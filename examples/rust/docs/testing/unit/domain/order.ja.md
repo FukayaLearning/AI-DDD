@@ -1,19 +1,19 @@
 <!-- ai-ddd-translation: source=order.md sha256=90af779e49497d4622a0049f0543c9c172041e998899ceaf75c5d9798a8b9a2d locale=ja -->
 
-# Unit Test Specification — domain/order
+# 単体試験仕様書 — domain/order
 
-| ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |
+| ID | 設計要素 | 試験技法 | 入力 | 期待結果 | 根拠 | 自動試験 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `UT-ORD-001` | `OrderId` | Equivalence partitioning | Whitespace string / trimmed string | `Err(INVALID_ORDER_ID)` / `Ok` | `REQ-ORD-001` | `tests/ordering_test.rs` |
-| `UT-ORD-002` | `CustomerId` | Equivalence partitioning | Empty string / trimmed string | `Err(INVALID_CUSTOMER_ID)` / `Ok` | `REQ-ORD-001` | `tests/ordering_test.rs` |
-| `UT-ORD-003` | `ProductId` | Equivalence partitioning | Empty string / trimmed string | `Err(INVALID_PRODUCT_ID)` / `Ok` | `REQ-ORD-001` | `tests/ordering_test.rs` |
-| `UT-ORD-004` | `Quantity` | Boundary value analysis | `0`, `1`, `100`, `101`, `1.5` | `Ok` for `1..100` integer, `Err(INVALID_QUANTITY)` otherwise | `REQ-ORD-001` | `tests/ordering_test.rs` |
-| `UT-ORD-005` | `Money` | Boundary value analysis | `-1`, `10.5`, `0 JPY`, `500 JPY`, `5 USD` | `Err(INVALID_MONEY_AMOUNT)` for negative/decimal, `Ok` otherwise | `REQ-ORD-001` | `tests/ordering_test.rs` |
-| `UT-ORD-006` | `Money` operations | Equivalence partitioning | `multiplyMoney`, `addMoney` same & different currency | Correct product/sum or `Err(CURRENCY_MISMATCH)` | `REQ-ORD-001` | `tests/ordering_test.rs` |
-| `UT-ORD-007` | `Order.create` (lines=0) | Boundary value analysis | Empty line array `[]` | `Err(EMPTY_ORDER_LINES)` | `SCN-ORD-001-02` | `tests/ordering_test.rs` |
-| `UT-ORD-008` | `Order.create` (lines=6) | Boundary value analysis | 6 unique order lines | `Err(TOO_MANY_ORDER_LINES)` | `SCN-ORD-001-02` | `tests/ordering_test.rs` |
-| `UT-ORD-009` | `Order.create` (duplicate) | Error guessing | Two lines with identical `ProductId` | `Err(DUPLICATE_PRODUCT)` | `SCN-ORD-001-02` | `tests/ordering_test.rs` |
-| `UT-ORD-010` | `Order.create` (currency) | Error guessing | Lines mixing `JPY` and `USD` | `Err(CURRENCY_MISMATCH)` | `SCN-ORD-001-02` | `tests/ordering_test.rs` |
-| `UT-ORD-011` | `Order.create` (valid) | Equivalence partitioning | 1..5 valid lines | `Ok(Draft)` and accurate `totalAmount()` | `SCN-ORD-001-01` | `tests/ordering_test.rs` |
-| `UT-ORD-012` | `Order.confirm` | State transition | `Draft` -> `Confirmed` -> `confirm()` | `Confirmed` + `OrderConfirmedEvent`, second confirm returns `INVALID_ORDER_STATE` | `REQ-ORD-002` | `tests/ordering_test.rs` |
-| `UT-ORD-013` | `Order.cancel` | State transition | `Confirmed` -> `Cancelled` -> `cancel()` | `Cancelled` + `OrderCancelledEvent`, second cancel returns `INVALID_ORDER_STATE` | `REQ-ORD-003` | `tests/ordering_test.rs` |
+| `UT-ORD-001` | `OrderId` | 同値分割 | 空白文字列 / 前後空白付き文字列 | `Err(INVALID_ORDER_ID)` / `Ok` | `REQ-ORD-001` | `tests/ordering_test.rs` |
+| `UT-ORD-002` | `CustomerId` | 同値分割 | 空文字列 / 前後空白付き文字列 | `Err(INVALID_CUSTOMER_ID)` / `Ok` | `REQ-ORD-001` | `tests/ordering_test.rs` |
+| `UT-ORD-003` | `ProductId` | 同値分割 | 空文字列 / 前後空白付き文字列 | `Err(INVALID_PRODUCT_ID)` / `Ok` | `REQ-ORD-001` | `tests/ordering_test.rs` |
+| `UT-ORD-004` | `Quantity` | 境界値分析 | `0`, `1`, `100`, `101`, `1.5` | `1..100` の整数は `Ok`、それ以外は `Err(INVALID_QUANTITY)` | `REQ-ORD-001` | `tests/ordering_test.rs` |
+| `UT-ORD-005` | `Money` | 境界値分析 | `-1`, `10.5`, `0 JPY`, `500 JPY`, `5 USD` | 負値・小数は `Err(INVALID_MONEY_AMOUNT)`、それ以外は `Ok` | `REQ-ORD-001` | `tests/ordering_test.rs` |
+| `UT-ORD-006` | `Money` 演算 | 同値分割 | `multiplyMoney`、`addMoney` の同一通貨・異通貨 | 正しい積・和、または `Err(CURRENCY_MISMATCH)` | `REQ-ORD-001` | `tests/ordering_test.rs` |
+| `UT-ORD-007` | `Order.create`（明細 0 件） | 境界値分析 | 空の明細配列 `[]` | `Err(EMPTY_ORDER_LINES)` | `SCN-ORD-001-02` | `tests/ordering_test.rs` |
+| `UT-ORD-008` | `Order.create`（明細 6 件） | 境界値分析 | 重複のない明細 6 件 | `Err(TOO_MANY_ORDER_LINES)` | `SCN-ORD-001-02` | `tests/ordering_test.rs` |
+| `UT-ORD-009` | `Order.create`（重複） | エラー推測 | 同一 `ProductId` を持つ明細 2 件 | `Err(DUPLICATE_PRODUCT)` | `SCN-ORD-001-02` | `tests/ordering_test.rs` |
+| `UT-ORD-010` | `Order.create`（通貨） | エラー推測 | `JPY` と `USD` が混在する明細 | `Err(CURRENCY_MISMATCH)` | `SCN-ORD-001-02` | `tests/ordering_test.rs` |
+| `UT-ORD-011` | `Order.create`（正常） | 同値分割 | 有効な明細 1〜5 件 | `Ok(Draft)` かつ `totalAmount()` が正確 | `SCN-ORD-001-01` | `tests/ordering_test.rs` |
+| `UT-ORD-012` | `Order.confirm` | 状態遷移 | `Draft` -> `Confirmed` -> `confirm()` | `Confirmed` と `OrderConfirmedEvent`、2 回目の confirm は `INVALID_ORDER_STATE` | `REQ-ORD-002` | `tests/ordering_test.rs` |
+| `UT-ORD-013` | `Order.cancel` | 状態遷移 | `Confirmed` -> `Cancelled` -> `cancel()` | `Cancelled` と `OrderCancelledEvent`、2 回目の cancel は `INVALID_ORDER_STATE` | `REQ-ORD-003` | `tests/ordering_test.rs` |

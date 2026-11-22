@@ -191,6 +191,7 @@ export class SystemClockAdapter implements ClockPort {
   readonly unavailableTitle: string;
   readonly notFoundTitle: string;
   readonly notFoundBody: string;
+  readonly errorMessages: Readonly<Record<string, string>>;
 }
 
 export const enMessages: HealthMessages = {
@@ -199,6 +200,9 @@ export const enMessages: HealthMessages = {
   unavailableTitle: "Service Unavailable",
   notFoundTitle: "Not Found",
   notFoundBody: "Page Not Found",
+  errorMessages: {
+    CLOCK_UNAVAILABLE: "System clock is unavailable",
+  },
 };
 `;
 
@@ -212,6 +216,9 @@ export const userMessages: HealthMessages = {
   unavailableTitle: ${JSON.stringify(isJa ? "サービス利用不可" : `[${locale}] Service Unavailable`)},
   notFoundTitle: ${JSON.stringify(isJa ? "見つかりません" : `[${locale}] Not Found`)},
   notFoundBody: ${JSON.stringify(isJa ? "ページが見つかりません" : `[${locale}] Page Not Found`)},
+  errorMessages: {
+    CLOCK_UNAVAILABLE: ${JSON.stringify(isJa ? "システム時刻を取得できません" : `[${locale}] System clock is unavailable`)},
+  },
 };
 `;
   }
@@ -229,6 +236,10 @@ export function renderHealthHtml(locale: string, title: string, bodyHtml: string
 </html>\`;
 }
 
+function localizeError(messages: HealthMessages, error: { code: string; message: string }): string {
+  return messages.errorMessages[error.code] ?? error.message;
+}
+
 export function createWebHandler(useCase: GetHealthUseCase, messages: HealthMessages = enMessages) {
   return async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     if (req.method === "GET" && req.url === "/") {
@@ -239,7 +250,7 @@ export function createWebHandler(useCase: GetHealthUseCase, messages: HealthMess
           renderHealthHtml(
             messages.locale,
             messages.unavailableTitle,
-            \`<main><div data-testid="error-banner">\${result.error.code}: \${result.error.message}</div></main>\`
+            \`<main><div data-testid="error-banner">\${result.error.code}: \${localizeError(messages, result.error)}</div></main>\`
           )
         );
         return;
@@ -671,7 +682,11 @@ test("UT-${C}-007 presentation renders healthy, error, 404, and localized views"
     nextResult = err({ code: "CLOCK_UNAVAILABLE", message: "mock outage" });
     await browser.goto(\`\${baseUrl}/\`);
     assert.equal(await browser.title(), "Service Unavailable");
-    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "CLOCK_UNAVAILABLE: mock outage");
+    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "CLOCK_UNAVAILABLE: System clock is unavailable");
+
+    nextResult = err({ code: "UNKNOWN_CODE", message: "raw fallback" });
+    await browser.goto(\`\${baseUrl}/\`);
+    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "UNKNOWN_CODE: raw fallback");
 
     await browser.goto(\`\${baseUrl}/missing\`);
     assert.equal(await browser.textContent('[data-testid="not-found"]'), "Page Not Found");

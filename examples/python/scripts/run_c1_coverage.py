@@ -13,13 +13,23 @@ def is_excluded(rel: str) -> bool:
 
 
 def expected_branches(code):
+    # PEP 649 lazy annotation code objects are not user-observable behavior.
+    if code.co_name == "__annotate__":
+        return {}
     branches = {}
     insns = list(dis.get_instructions(code))
     for idx, ins in enumerate(insns):
         if "JUMP_IF_" in ins.opname or "POP_JUMP_IF_" in ins.opname:
             if idx >= 2 and insns[idx - 1].opname == "CHECK_EXC_MATCH" and insns[idx - 2].argval == "Exception":
                 continue
-            fallthrough = insns[idx + 1].offset if idx + 1 < len(insns) else None
+            # Skip CPython specialization guards (e.g. builtin `tuple` identity fast path).
+            if idx >= 2 and insns[idx - 1].opname == "IS_OP" and insns[idx - 2].opname == "LOAD_COMMON_CONSTANT":
+                continue
+            next_idx = idx + 1
+            # Python 3.14 emits NOT_TAKEN pseudo-instructions before the fallthrough target.
+            while next_idx < len(insns) and insns[next_idx].opname == "NOT_TAKEN":
+                next_idx += 1
+            fallthrough = insns[next_idx].offset if next_idx < len(insns) else None
             branches[(code, ins.offset)] = {ins.argval, fallthrough} - {None}
     for const in code.co_consts:
         if hasattr(const, "co_code"):

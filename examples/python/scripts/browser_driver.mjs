@@ -127,6 +127,12 @@ try {
         returnByValue: true,
       }, sessionId);
       assert.equal(Boolean(res.result?.value), act.expected);
+    } else if (act.type === "assertAttr") {
+      const res = await send("Runtime.evaluate", {
+        expression: `document.querySelector(${JSON.stringify(act.selector)})?.getAttribute(${JSON.stringify(act.attr)}) ?? null`,
+        returnByValue: true,
+      }, sessionId);
+      assert.equal(res.result?.value ?? null, act.expected);
     }
   }
 } catch (err) {

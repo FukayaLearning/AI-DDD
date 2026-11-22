@@ -1,11 +1,11 @@
 <!-- ai-ddd-translation: source=order_web.md sha256=917fdefb648f8152f1925f59b54275badc1d4fdf508c1738593764ddeadce3d7 locale=ja -->
 
-# Unit Test Specification — presentation/web/order
+# 単体試験仕様書 — presentation/web/order
 
-| ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |
+| ID | 設計要素 | 試験技法 | 入力 | 期待結果 | 根拠 | 自動試験 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `UT-ORD-027` | Order creation form | Headless browser branch | Invalid form submission & valid form submission | Error banner on 422; `Draft` order view with total on 200 | `SCN-ORD-004-01` | `tests/unit/test_ordering.py` |
-| `UT-ORD-028` | Confirm action | Headless browser branch | Mock `confirmOrder` returning `INSUFFICIENT_STOCK` then `Ok(Confirmed)` | Error banner, then `Confirmed` status and disabled confirm button | `SCN-ORD-004-01` | `tests/unit/test_ordering.py` |
-| `UT-ORD-029` | Cancel action | Headless browser branch | Mock `cancelOrder` returning `REPOSITORY_ERROR` then `Ok(Cancelled)` | Error banner, then `Cancelled` status and both action buttons disabled | `SCN-ORD-004-01` | `tests/unit/test_ordering.py` |
-| `UT-ORD-030` | Detail & 404 routes | Headless browser & HTTP branch | Existing order GET, unknown order GET, unknown route GET, unknown POST/PUT | Order detail DOM, `ORDER_NOT_FOUND` banner, 404 Not Found views | `SCN-ORD-004-01` | `tests/unit/test_ordering.py` |
-| `UT-ORD-031` | Localized UI catalogs | Headless browser branch | Server started with `ja` and `en` message catalogs | Localized headings/buttons and matching `<html lang>` | `REQ-ORD-004` | `tests/unit/test_ordering.py` |
+| `UT-ORD-027` | 注文作成フォーム | ヘッドレスブラウザー分岐 | 不正なフォーム送信と有効なフォーム送信 | 422 ではエラーバナー、200 では合計付きの `Draft` 注文表示 | `SCN-ORD-004-01` | `tests/unit/test_ordering.py` |
+| `UT-ORD-028` | 承認操作 | ヘッドレスブラウザー分岐 | `confirmOrder` のモックが `INSUFFICIENT_STOCK` を返した後に `Ok(Confirmed)` | エラーバナー、その後 `Confirmed` 状態と承認ボタンの無効化 | `SCN-ORD-004-01` | `tests/unit/test_ordering.py` |
+| `UT-ORD-029` | 取消操作 | ヘッドレスブラウザー分岐 | `cancelOrder` のモックが `REPOSITORY_ERROR` を返した後に `Ok(Cancelled)` | エラーバナー、その後 `Cancelled` 状態と両操作ボタンの無効化 | `SCN-ORD-004-01` | `tests/unit/test_ordering.py` |
+| `UT-ORD-030` | 詳細・404 ルート | ヘッドレスブラウザー・HTTP 分岐 | 既存注文 GET、未存在注文 GET、未定義ルート GET、未定義 POST/PUT | 注文詳細 DOM、`ORDER_NOT_FOUND` バナー、404 の Not Found 表示 | `SCN-ORD-004-01` | `tests/unit/test_ordering.py` |
+| `UT-ORD-031` | ロケール別 UI カタログ | ヘッドレスブラウザー分岐 | `ja` と `en` のメッセージカタログで起動したサーバー | ロケール別の見出し・ボタンと一致する `<html lang>` | `REQ-ORD-004` | `tests/unit/test_ordering.py` |

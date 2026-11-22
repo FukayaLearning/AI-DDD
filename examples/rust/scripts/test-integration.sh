@@ -75,6 +75,10 @@ const assert = require("node:assert/strict");
     assert.equal(reCnf.status, 422);
     assert.match(await reCnf.text(), /INVALID_ORDER_STATE/);
 
+    const reCancel = await fetch(baseUrl + "/orders/ORD-INT-1/cancel", { method: "POST" });
+    assert.equal(reCancel.status, 422);
+    assert.match(await reCancel.text(), /INVALID_ORDER_STATE/);
+
     // IT-ORD-002
     const badQty = await fetch(baseUrl + "/orders", {
       method: "POST",

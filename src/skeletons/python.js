@@ -156,6 +156,9 @@ class SystemClockAdapter:
     "unavailableTitle": "Service Unavailable",
     "notFoundTitle": "Not Found",
     "notFoundBody": "Page Not Found",
+    "errorMessages": {
+        "CLOCK_UNAVAILABLE": "System clock is unavailable",
+    },
 }
 `;
 
@@ -167,6 +170,9 @@ class SystemClockAdapter:
     "unavailableTitle": ${JSON.stringify(isJa ? "サービス利用不可" : `[${locale}] Service Unavailable`)},
     "notFoundTitle": ${JSON.stringify(isJa ? "見つかりません" : `[${locale}] Not Found`)},
     "notFoundBody": ${JSON.stringify(isJa ? "ページが見つかりません" : `[${locale}] Page Not Found`)},
+    "errorMessages": {
+        "CLOCK_UNAVAILABLE": ${JSON.stringify(isJa ? "システム時刻を取得できません" : `[${locale}] System clock is unavailable`)},
+    },
 }
 `;
   }
@@ -185,6 +191,11 @@ def render_html(locale: str, title: str, body: str) -> str:
     return f"<!doctype html><html lang='{escape(locale)}'><head><meta charset='utf-8'><title>{escape(title)}</title></head><body>{body}</body></html>"
 
 
+def _localize_error(msg: Dict[str, object], code: str, fallback: str) -> str:
+    localized = msg.get("errorMessages", {})
+    return localized.get(code, fallback)
+
+
 def make_handler(use_case: GetHealthUseCase, messages: Dict[str, str] = EN_MESSAGES):
     msg = messages
 
@@ -199,7 +210,7 @@ def make_handler(use_case: GetHealthUseCase, messages: Dict[str, str] = EN_MESSA
                     html = render_html(
                         msg["locale"],
                         msg["unavailableTitle"],
-                        f"<main><div data-testid='error-banner'>{escape(result.error.code)}: {escape(result.error.message)}</div></main>",
+                        f"<main><div data-testid='error-banner'>{escape(result.error.code)}: {escape(_localize_error(msg, result.error.code, result.error.message))}</div></main>",
                     )
                     self._send(503, html)
                     return
@@ -285,6 +296,9 @@ EXCLUDED = {"src/infrastructure/drivers/clock/clock_driver.py", "src/main.py"}
 
 
 def expected_branches(code):
+    # PEP 649 lazy annotation code objects are not user-observable behavior.
+    if code.co_name == "__annotate__":
+        return {}
     branches = {}
     insns = list(dis.get_instructions(code))
     for idx, ins in enumerate(insns):
@@ -292,7 +306,14 @@ def expected_branches(code):
             # Skip synthetic catch-all except Exception mismatch branch (BaseException propagation)
             if idx >= 2 and insns[idx - 1].opname == "CHECK_EXC_MATCH" and insns[idx - 2].argval == "Exception":
                 continue
-            fallthrough = insns[idx + 1].offset if idx + 1 < len(insns) else None
+            # Skip CPython specialization guards (e.g. builtin 'tuple' identity fast path).
+            if idx >= 2 and insns[idx - 1].opname == "IS_OP" and insns[idx - 2].opname == "LOAD_COMMON_CONSTANT":
+                continue
+            next_idx = idx + 1
+            # Python 3.14 emits NOT_TAKEN pseudo-instructions before the fallthrough target.
+            while next_idx < len(insns) and insns[next_idx].opname == "NOT_TAKEN":
+                next_idx += 1
+            fallthrough = insns[next_idx].offset if next_idx < len(insns) else None
             branches[(code, ins.offset)] = {ins.argval, fallthrough} - {None}
     for const in code.co_consts:
         if hasattr(const, "co_code"):
@@ -545,14 +566,14 @@ class TestSkeletonLayers(unittest.TestCase):
             subprocess.run(["node", str(ROOT / "scripts" / "browser_driver.mjs"), json.dumps(scenarios)], check=True)
             mock_uc.result = Err(DomainError(code="CLOCK_UNAVAILABLE", message="mock outage"))
             scenarios_err = [
-                {"url": f"{base_url}/", "selector": "[data-testid='error-banner']", "expected": "CLOCK_UNAVAILABLE: mock outage"},
+                {"url": f"{base_url}/", "selector": "[data-testid='error-banner']", "expected": "CLOCK_UNAVAILABLE: System clock is unavailable"},
                 {"url": f"{base_url}/missing", "selector": "[data-testid='not-found']", "expected": "Page Not Found"},
             ]
             subprocess.run(["node", str(ROOT / "scripts" / "browser_driver.mjs"), json.dumps(scenarios_err)], check=True)
 ${locale !== "en" ? `        import importlib
         user_msg = importlib.import_module("src.presentation.web.i18n.${locale}").MESSAGES
         with run_presentation_server(mock_uc, 0, user_msg) as base_url_loc:
-            subprocess.run(["node", str(ROOT / "scripts" / "browser_driver.mjs"), json.dumps([{"url": f"{base_url_loc}/", "selector": "[data-testid='error-banner']", "expected": "CLOCK_UNAVAILABLE: mock outage"}])], check=True)` : ""}
+            subprocess.run(["node", str(ROOT / "scripts" / "browser_driver.mjs"), json.dumps([{"url": f"{base_url_loc}/", "selector": "[data-testid='error-banner']", "expected": ${JSON.stringify(locale === "ja" ? "CLOCK_UNAVAILABLE: システム時刻を取得できません" : `CLOCK_UNAVAILABLE: [${locale}] System clock is unavailable`)} }])], check=True)` : ""}
 `;
 
   if (dist === "docker") {

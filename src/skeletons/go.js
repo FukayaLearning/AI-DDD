@@ -162,6 +162,7 @@ type HealthMessages struct {
 	UnavailableTitle string
 	NotFoundTitle    string
 	NotFoundBody     string
+	ErrorMessages    map[string]string
 }
 
 var EnMessages = HealthMessages{
@@ -170,6 +171,9 @@ var EnMessages = HealthMessages{
 	UnavailableTitle: "Service Unavailable",
 	NotFoundTitle:    "Not Found",
 	NotFoundBody:     "Page Not Found",
+	ErrorMessages: map[string]string{
+		"CLOCK_UNAVAILABLE": "System clock is unavailable",
+	},
 }
 `;
 
@@ -183,6 +187,9 @@ var UserMessages = HealthMessages{
 	UnavailableTitle: ${JSON.stringify(isJa ? "サービス利用不可" : `[${locale}] Service Unavailable`)},
 	NotFoundTitle:    ${JSON.stringify(isJa ? "見つかりません" : `[${locale}] Not Found`)},
 	NotFoundBody:     ${JSON.stringify(isJa ? "ページが見つかりません" : `[${locale}] Page Not Found`)},
+	ErrorMessages: map[string]string{
+		"CLOCK_UNAVAILABLE": ${JSON.stringify(isJa ? "システム時刻を取得できません" : `[${locale}] System clock is unavailable`)},
+	},
 }
 `;
   }
@@ -201,6 +208,13 @@ func RenderHealthHTML(locale string, title string, body string) string {
 	return fmt.Sprintf("<!doctype html><html lang='%s'><head><meta charset='utf-8'><title>%s</title></head><body>%s</body></html>", html.EscapeString(locale), html.EscapeString(title), body)
 }
 
+func localizeError(msg i18n.HealthMessages, code, fallback string) string {
+	if localized, ok := msg.ErrorMessages[code]; ok {
+		return localized
+	}
+	return fallback
+}
+
 func NewWebHandler(useCase queries.GetHealthUseCase, msg i18n.HealthMessages) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/" {
@@ -208,7 +222,7 @@ func NewWebHandler(useCase queries.GetHealthUseCase, msg i18n.HealthMessages) ht
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			if !res.Ok {
 				w.WriteHeader(http.StatusServiceUnavailable)
-				_, _ = w.Write([]byte(RenderHealthHTML(msg.Locale, msg.UnavailableTitle, fmt.Sprintf("<main><div data-testid='error-banner'>%s: %s</div></main>", html.EscapeString(res.Error.Code), html.EscapeString(res.Error.Message)))))
+				_, _ = w.Write([]byte(RenderHealthHTML(msg.Locale, msg.UnavailableTitle, fmt.Sprintf("<main><div data-testid='error-banner'>%s: %s</div></main>", html.EscapeString(res.Error.Code), html.EscapeString(localizeError(msg, res.Error.Code, res.Error.Message))))))
 				return
 			}
 			w.WriteHeader(http.StatusOK)
@@ -377,11 +391,19 @@ func TestUT_${C}_007_PresentationWebUIWithBrowser(t *testing.T) {
 
 	uc.res = shared.Failure[domain.HealthStatus, domain.DomainError](domain.DomainError{Code: "CLOCK_UNAVAILABLE", Message: "mock outage"})
 	scenariosErr, _ := json.Marshal([]map[string]string{
-		{"url": srv.URL + "/", "selector": "[data-testid='error-banner']", "expected": "CLOCK_UNAVAILABLE: mock outage"},
+		{"url": srv.URL + "/", "selector": "[data-testid='error-banner']", "expected": "CLOCK_UNAVAILABLE: System clock is unavailable"},
 		{"url": srv.URL + "/missing", "selector": "[data-testid='not-found']", "expected": "Page Not Found"},
 	})
 	if out, err := exec.Command("node", "../../../../scripts/browser_driver.mjs", string(scenariosErr)).CombinedOutput(); err != nil {
 		t.Fatalf("browser error test failed: %v %s", err, string(out))
+	}
+
+	uc.res = shared.Failure[domain.HealthStatus, domain.DomainError](domain.DomainError{Code: "UNKNOWN_CODE", Message: "raw fallback"})
+	scenariosRaw, _ := json.Marshal([]map[string]string{
+		{"url": srv.URL + "/", "selector": "[data-testid='error-banner']", "expected": "UNKNOWN_CODE: raw fallback"},
+	})
+	if out, err := exec.Command("node", "../../../../scripts/browser_driver.mjs", string(scenariosRaw)).CombinedOutput(); err != nil {
+		t.Fatalf("browser fallback test failed: %v %s", err, string(out))
 	}
 }
 `;

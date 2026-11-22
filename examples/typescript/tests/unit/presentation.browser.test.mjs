@@ -46,7 +46,7 @@ test("UT-ORD-027 UT-ORD-028 UT-ORD-029 UT-ORD-030 presentation browser lifecycle
     await browser.fill('input[name="customerId"]', "CUST-9");
     await browser.fill('input[name="productId"]', "BOOK-A");
     await browser.clickAndWait('[data-testid="place-order-btn"]');
-    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "EMPTY_ORDER_LINES: invalid lines");
+    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "EMPTY_ORDER_LINES: Order must contain at least one line");
 
     // 2. Place valid order via form -> 200 Draft view
     nextPlaceResult = ok(dtoDraft);
@@ -61,7 +61,7 @@ test("UT-ORD-027 UT-ORD-028 UT-ORD-029 UT-ORD-030 presentation browser lifecycle
     // 3. Confirm fails with INSUFFICIENT_STOCK -> error banner on detail view
     nextConfirmResult = err(domainError("INSUFFICIENT_STOCK", "out of stock"));
     await browser.clickAndWait('[data-testid="confirm-btn"]');
-    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "INSUFFICIENT_STOCK: out of stock");
+    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "INSUFFICIENT_STOCK: Insufficient stock");
 
     // 4. Confirm succeeds -> Confirmed status & confirm button disabled
     nextConfirmResult = ok(dtoConfirmed);
@@ -74,7 +74,7 @@ test("UT-ORD-027 UT-ORD-028 UT-ORD-029 UT-ORD-030 presentation browser lifecycle
     // 5. Cancel fails -> error banner on detail view
     nextCancelResult = err(domainError("REPOSITORY_ERROR", "db busy"));
     await browser.clickAndWait('[data-testid="cancel-btn"]');
-    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "REPOSITORY_ERROR: db busy");
+    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "REPOSITORY_ERROR: Failed to access order storage");
 
     // 6. Cancel succeeds -> Cancelled status & both buttons disabled
     nextCancelResult = ok(dtoCancelled);
@@ -91,10 +91,15 @@ test("UT-ORD-027 UT-ORD-028 UT-ORD-029 UT-ORD-030 presentation browser lifecycle
 
     nextGetResult = err(domainError("ORDER_NOT_FOUND", "missing"));
     await browser.goto(`${baseUrl}/orders/UNKNOWN`);
-    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "ORDER_NOT_FOUND: missing");
+    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "ORDER_NOT_FOUND: Order not found");
 
     await browser.goto(`${baseUrl}/not-exist`);
     assert.equal(await browser.textContent('[data-testid="not-found"]'), "Page Not Found");
+
+    // 7b. Unknown error code falls back to the raw DomainError message
+    nextGetResult = err(domainError("UNKNOWN_CODE", "raw fallback"));
+    await browser.goto(`${baseUrl}/orders/ORD-WEB-1`);
+    assert.equal(await browser.textContent('[data-testid="error-banner"]'), "UNKNOWN_CODE: raw fallback");
 
     // 8. POST confirm/cancel on missing order & unsupported POST/PUT paths
     nextConfirmResult = err(domainError("ORDER_NOT_FOUND", "missing"));

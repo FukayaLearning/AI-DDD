@@ -339,3 +339,84 @@ console.log("PASS: governance traceability analysis & matrix tests");
 }
 
 console.log("PASS: governance test-spec checklist & 4-language test ID tests");
+
+// 8. Localization: translation header locale must match path locale & en UI catalog required
+{
+  const dir = makeFixture({ userLocale: "ja" });
+  try {
+    writeFile(dir, "docs/domain/ubiquitous-language.ja.md", "# UL (JA)\n");
+    writeFile(dir, "docs/domain/context-map.ja.md", "# CM (JA)\n");
+    stampTranslationFile(dir, "docs/domain/ubiquitous-language.ja.md");
+    stampTranslationFile(dir, "docs/domain/context-map.ja.md");
+    const ulPath = path.join(dir, "docs/domain/ubiquitous-language.ja.md");
+    const ul = fs.readFileSync(ulPath, "utf8").replace("locale=ja", "locale=en");
+    fs.writeFileSync(ulPath, ul);
+    writeFile(dir, "src/presentation/web/i18n/ja.ts", 'export const ja = { title: "注文" };\n');
+
+    const r = verifyProject(dir);
+    assert.equal(r.ok, false);
+    assert.ok(
+      r.errors.some((e) => e.includes("[Translation Locale Mismatch]") && e.includes("ubiquitous-language.ja.md"))
+    );
+    assert.ok(r.errors.some((e) => e.includes("[Missing UI Catalog]") && e.includes("master 'en' catalog is required")));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("PASS: governance translation locale & UI catalog master checks");
+
+// 9. Traceability: requirement context code and scenario parent prefix are enforced
+{
+  const dir = makeFixture();
+  try {
+    writeFile(
+      dir,
+      "openspec/specs/ordering/order/spec.md",
+      `# Spec
+### Requirement: REQ-XYZ-001 Wrong context
+The system SHALL x.
+#### Scenario: SCN-ORD-001-01 Wrong parent
+- **WHEN** x
+- **THEN** y
+`
+    );
+    const res = analyzeTraceability(dir);
+    assert.equal(res.ok, false);
+    assert.ok(res.errors.some((e) => e.includes("[Context Code Mismatch]") && e.includes("REQ-XYZ-001")));
+    assert.ok(res.errors.some((e) => e.includes("[Scenario Parent Mismatch]") && e.includes("SCN-ORD-001-01")));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("PASS: governance traceability context-code & scenario-parent checks");
+
+// 10. Test-spec: integration abnormal-path checklist requires IT-* case IDs (not UT-*)
+{
+  const dir = makeFixture();
+  try {
+    writeFile(
+      dir,
+      "docs/testing/integration/order.md",
+      `# Integration Test Spec
+| Category | Case IDs | N/A Reason |
+| :--- | :--- | :--- |
+| Input boundary & invalid values | \`UT-ORD-002\` | |
+| Invalid state transition | \`IT-ORD-003\` | |
+| External dependency failure | \`IT-ORD-006\` | |
+| Persistence / storage failure | \`IT-ORD-004\` | |
+| Duplicate / concurrent conflict | | Single-writer local KV |
+| Target not found | \`IT-ORD-005\` | |
+| Locale-specific rendering | \`IT-ORD-007\` | |
+`
+    );
+    const errs = verifyIntegrationChecklists(dir);
+    assert.equal(errs.length, 1, JSON.stringify(errs));
+    assert.ok(errs[0].includes("Input boundary") && errs[0].includes("requires IT-* case IDs"));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("PASS: governance integration checklist IT-only case ID checks");

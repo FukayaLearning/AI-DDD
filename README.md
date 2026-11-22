@@ -70,5 +70,5 @@ npm test
 npm run verify:examples
 
 # Validate root OpenSpec change
-openspec validate bootstrap-ai-ddd-platform --strict
+openspec validate strengthen-engineering-governance --strict
 ```

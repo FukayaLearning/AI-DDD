@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { loadProjectConfig } from "./config.js";
 
 const REQ_HEADING_RE = /^###\s+Requirement:\s*(.+)$/;
 const SCN_HEADING_RE = /^####\s+Scenario:\s*(.+)$/;
@@ -48,7 +49,7 @@ function isTestFilePath(rel) {
   );
 }
 
-function parseSpecFiles(absTarget, includeChanges) {
+function parseSpecFiles(absTarget, includeChanges, expectedContextCode) {
   const specFiles = [];
   const mainSpecsDir = path.join(absTarget, "openspec", "specs");
   for (const f of walk(mainSpecsDir, (p, n) => n.endsWith(".md"))) {
@@ -88,6 +89,12 @@ function parseSpecFiles(absTarget, includeChanges) {
           currentReqId = null;
         } else {
           const id = idm[1];
+          const reqCtx = id.split("-")[1];
+          if (expectedContextCode && reqCtx !== expectedContextCode) {
+            errors.push(
+              `[Context Code Mismatch] ${rel}:${idx + 1}: '${id}' does not match configured context code '${expectedContextCode}'`
+            );
+          }
           if (requirements.has(id)) {
             errors.push(`[Duplicate Requirement ID] ${rel}:${idx + 1}: '${id}' already defined in ${requirements.get(id).file}`);
           } else {
@@ -106,6 +113,14 @@ function parseSpecFiles(absTarget, includeChanges) {
           errors.push(`[Missing Scenario ID] ${rel}:${idx + 1}: '${title}' must start with SCN-<CTX>-<NNN>-<NN>`);
         } else {
           const id = idm[1];
+          if (currentReqId) {
+            const expectedPrefix = `SCN-${currentReqId.slice(4)}-`;
+            if (!id.startsWith(expectedPrefix)) {
+              errors.push(
+                `[Scenario Parent Mismatch] ${rel}:${idx + 1}: '${id}' must start with '${expectedPrefix}' under '${currentReqId}'`
+              );
+            }
+          }
           if (scenarios.has(id)) {
             errors.push(`[Duplicate Scenario ID] ${rel}:${idx + 1}: '${id}' already defined in ${scenarios.get(id).file}`);
           } else {
@@ -186,7 +201,13 @@ function scanCodeAndTests(absTarget) {
 
 export function analyzeTraceability(targetDir, { includeChanges = false } = {}) {
   const absTarget = path.resolve(targetDir);
-  const { requirements, scenarios, errors: specErrors } = parseSpecFiles(absTarget, includeChanges);
+  const cfg = loadProjectConfig(absTarget);
+  const expectedContextCode = cfg.config?.context?.code || "";
+  const { requirements, scenarios, errors: specErrors } = parseSpecFiles(
+    absTarget,
+    includeChanges,
+    expectedContextCode
+  );
   const { testCases, errors: tcErrors } = parseTestSpecTables(absTarget);
   const { testRefs, implRefs } = scanCodeAndTests(absTarget);
 

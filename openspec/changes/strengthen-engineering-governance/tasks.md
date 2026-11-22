@@ -52,7 +52,7 @@
 ## 10. 統合検証とレビュー
 
 - [x] 10.1 実行用サブエージェントで `npm test`・`npm run verify:examples`・`openspec validate strengthen-engineering-governance --strict` を実行し、すべて成功することを確認する
-- [ ] 10.2 ゼロコンテキストの独立レビューサブエージェントで、仕様（7 capability）と実装・試験仕様書・トレーサビリティマトリクス・翻訳の整合を監査し、指摘を解消する
+- [x] 10.2 ゼロコンテキストの独立レビューサブエージェントで、仕様（7 capability）と実装・試験仕様書・トレーサビリティマトリクス・翻訳の整合を監査し、指摘を解消する
 
 ## Workflow follow-up
 

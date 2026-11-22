@@ -12,6 +12,7 @@ const CHECKLIST_CATEGORIES = [
 ];
 
 const CASE_ID_IN_TEXT = /\b(?:UT|IT)-[A-Z]{2,5}-\d{3}\b/;
+const IT_CASE_ID_IN_TEXT = /\bIT-[A-Z]{2,5}-\d{3}\b/;
 const CASE_ID_NORMALIZED = /(?:UT|IT)[_-][A-Z]{2,5}[_-]\d{3}/i;
 
 function isTranslationMd(rel) {
@@ -76,7 +77,7 @@ export function verifyIntegrationChecklists(absTarget) {
         );
         continue;
       }
-      const hasCaseId = CASE_ID_IN_TEXT.test(entry.caseIds);
+      const hasCaseId = IT_CASE_ID_IN_TEXT.test(entry.caseIds);
       const hasNa = entry.naReason.length > 0 && entry.naReason !== "-";
       if (!hasCaseId && !hasNa) {
         errors.push(

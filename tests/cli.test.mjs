@@ -236,6 +236,22 @@ function runShell(cmd, args, cwd) {
     fs.rmSync(jaDir, { recursive: true, force: true });
   }
 
+  for (const [lang, dist, cmd, args] of [
+    ["python", "library", "bash", ["scripts/run-unit-tests.sh"]],
+    ["go", "docker", null, null],
+    ["rust", "binary", "bash", ["scripts/test-unit-c1.sh"]],
+  ]) {
+    const d = makeTempDir(`ai-ddd-ja-${lang}-`);
+    try {
+      runNodeCli(["init", "--target", d, "--name", `ja-${lang}`, "--context", "billing", "--lang", lang, "--dist", dist, "--locale", "ja", "--yes"]);
+      assert.match(runNodeCli(["verify", "--target", d]), /PASS:/);
+      assert.match(runNodeCli(["trace", "--target", d, "--check"]), /Generated/);
+      if (cmd) runShell(cmd, args, d);
+    } finally {
+      fs.rmSync(d, { recursive: true, force: true });
+    }
+  }
+
   const enDir = makeTempDir("ai-ddd-en-");
   try {
     runNodeCli([

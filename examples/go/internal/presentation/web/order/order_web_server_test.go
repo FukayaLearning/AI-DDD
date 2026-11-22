@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"testing"
 	commands "example.com/ordering-go/internal/application/order/commands"
+	domainorder "example.com/ordering-go/internal/domain/order"
 	"example.com/ordering-go/internal/domain/shared"
 	"example.com/ordering-go/internal/presentation/web/i18n"
 	weborder "example.com/ordering-go/internal/presentation/web/order"
@@ -32,15 +33,15 @@ func runBrowser(t *testing.T, actions []map[string]any) {
 	}
 }
 
-// UT-ORD-027, UT-ORD-028, UT-ORD-029, UT-ORD-030, UT-ORD-031
+// UT-ORD-027, UT-ORD-028, UT-ORD-029, UT-ORD-030
 func TestUT_ORD_027_PresentationWebUIWithBrowser(t *testing.T) {
 	draft := commands.OrderSummaryDto{
-		OrderId: "ORD-WEB-1", CustomerId: "CUST-9", Status: shared.StatusDraft,
+		OrderId: "ORD-WEB-1", CustomerId: "CUST-9", Status: domainorder.StatusDraft,
 		Total: shared.Money{Amount: 2400, Currency: shared.CurrencyJPY},
 		Lines: []commands.OrderLineDto{{ProductId: "BOOK-A", Quantity: 2, UnitPrice: shared.Money{Amount: 1200, Currency: shared.CurrencyJPY}}},
 	}
-	confirmed := draft; confirmed.Status = shared.StatusConfirmed
-	cancelled := draft; cancelled.Status = shared.StatusCancelled
+	confirmed := draft; confirmed.Status = domainorder.StatusConfirmed
+	cancelled := draft; cancelled.Status = domainorder.StatusCancelled
 
 	uc := &mockOrderUseCases{
 		placeRes:   shared.Failure[commands.OrderSummaryDto, shared.DomainError](shared.NewDomainError("EMPTY_ORDER_LINES", "invalid lines")),
@@ -57,7 +58,7 @@ func TestUT_ORD_027_PresentationWebUIWithBrowser(t *testing.T) {
 		{"type": "fill", "selector": "input[name='customerId']", "value": "CUST-9"},
 		{"type": "fill", "selector": "input[name='productId']", "value": "BOOK-A"},
 		{"type": "click", "selector": "[data-testid='place-order-btn']"},
-		{"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "EMPTY_ORDER_LINES: invalid lines"},
+		{"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "EMPTY_ORDER_LINES: Order must contain at least one line"},
 	})
 
 	uc.placeRes = shared.Success[commands.OrderSummaryDto, shared.DomainError](draft)
@@ -74,7 +75,7 @@ func TestUT_ORD_027_PresentationWebUIWithBrowser(t *testing.T) {
 	runBrowser(t, []map[string]any{
 		{"type": "goto", "url": srv.URL + "/orders/ORD-WEB-1"},
 		{"type": "click", "selector": "[data-testid='confirm-btn']"},
-		{"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "INSUFFICIENT_STOCK: out of stock"},
+		{"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "INSUFFICIENT_STOCK: Insufficient stock"},
 	})
 
 	uc.confirmRes = shared.Success[commands.OrderSummaryDto, shared.DomainError](confirmed)
@@ -90,7 +91,7 @@ func TestUT_ORD_027_PresentationWebUIWithBrowser(t *testing.T) {
 	runBrowser(t, []map[string]any{
 		{"type": "goto", "url": srv.URL + "/orders/ORD-WEB-1"},
 		{"type": "click", "selector": "[data-testid='cancel-btn']"},
-		{"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "REPOSITORY_ERROR: db busy"},
+		{"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "REPOSITORY_ERROR: Failed to access order storage"},
 	})
 
 	uc.cancelRes = shared.Success[commands.OrderSummaryDto, shared.DomainError](cancelled)
@@ -104,9 +105,15 @@ func TestUT_ORD_027_PresentationWebUIWithBrowser(t *testing.T) {
 	uc.getRes = shared.Failure[commands.OrderSummaryDto, shared.DomainError](shared.NewDomainError("ORDER_NOT_FOUND", "missing"))
 	runBrowser(t, []map[string]any{
 		{"type": "goto", "url": srv.URL + "/orders/UNKNOWN"},
-		{"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "ORDER_NOT_FOUND: missing"},
+		{"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "ORDER_NOT_FOUND: Order not found"},
 		{"type": "goto", "url": srv.URL + "/not-exist"},
 		{"type": "assertText", "selector": "[data-testid='not-found']", "expected": "Page Not Found"},
+	})
+
+	uc.getRes = shared.Failure[commands.OrderSummaryDto, shared.DomainError](shared.NewDomainError("UNKNOWN_CODE", "raw fallback"))
+	runBrowser(t, []map[string]any{
+		{"type": "goto", "url": srv.URL + "/orders/ORD-WEB-1"},
+		{"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "UNKNOWN_CODE: raw fallback"},
 	})
 
 	for _, req := range []struct{ method, path string }{
@@ -122,4 +129,32 @@ func TestUT_ORD_027_PresentationWebUIWithBrowser(t *testing.T) {
 		}
 		_ = resp.Body.Close()
 	}
+}
+
+// UT-ORD-031
+func TestUT_ORD_031_JaLocalizedBrowser(t *testing.T) {
+	draft := commands.OrderSummaryDto{
+		OrderId: "ORD-WEB-1", CustomerId: "CUST-9", Status: domainorder.StatusDraft,
+		Total: shared.Money{Amount: 2400, Currency: shared.CurrencyJPY},
+		Lines: []commands.OrderLineDto{{ProductId: "BOOK-A", Quantity: 2, UnitPrice: shared.Money{Amount: 1200, Currency: shared.CurrencyJPY}}},
+	}
+	uc := &mockOrderUseCases{
+		getRes: shared.Success[commands.OrderSummaryDto, shared.DomainError](draft),
+	}
+	srv := httptest.NewServer(weborder.NewOrderWebHandler(uc, i18n.JaMessages))
+	defer srv.Close()
+
+	runBrowser(t, []map[string]any{
+		{"type": "goto", "url": srv.URL + "/"},
+		{"type": "assertAttr", "selector": "html", "attr": "lang", "expected": "ja"},
+		{"type": "assertText", "selector": "h1", "expected": "注文作成"},
+		{"type": "assertText", "selector": "[data-testid='place-order-btn']", "expected": "注文を確定する"},
+		{"type": "goto", "url": srv.URL + "/orders/ORD-WEB-1"},
+		{"type": "assertAttr", "selector": "html", "attr": "lang", "expected": "ja"},
+		{"type": "assertText", "selector": "h1", "expected": "注文 ORD-WEB-1"},
+		{"type": "assertText", "selector": "[data-testid='confirm-btn']", "expected": "注文承認"},
+		{"type": "assertText", "selector": "[data-testid='cancel-btn']", "expected": "注文取消"},
+		{"type": "goto", "url": srv.URL + "/not-exist"},
+		{"type": "assertText", "selector": "[data-testid='not-found']", "expected": "ページが見つかりません"},
+	})
 }

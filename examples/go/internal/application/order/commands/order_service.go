@@ -1,8 +1,10 @@
 package commands
 
-import appshared "example.com/ordering-go/internal/application/shared"
+import (
+	appshared "example.com/ordering-go/internal/application/shared"
 	domainorder "example.com/ordering-go/internal/domain/order"
 	"example.com/ordering-go/internal/domain/shared"
+)
 
 type PlaceOrderLineInput struct {
 	ProductId  string
@@ -92,7 +94,7 @@ func (s *OrderApplicationService) PlaceOrder(cmd PlaceOrderCommand) shared.Resul
 		}
 		built = append(built, domainorder.OrderLine{ProductId: pRes.Value, Quantity: qRes.Value, UnitPrice: mRes.Value})
 	}
-	orderRes := shared.CreateOrder(idRes.Value, custRes.Value, built, shared.StatusDraft, nil)
+	orderRes := domainorder.CreateOrder(idRes.Value, custRes.Value, built, domainorder.StatusDraft, nil)
 	if !orderRes.Ok {
 		return shared.Failure[OrderSummaryDto, shared.DomainError](*orderRes.Error)
 	}

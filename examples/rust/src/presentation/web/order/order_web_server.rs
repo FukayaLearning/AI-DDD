@@ -10,6 +10,10 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 
+fn localized_error<'a>(msg: &'a OrderMessages, err: &'a DomainError) -> &'a str {
+    msg.error_message(&err.code).unwrap_or(err.message.as_str())
+}
+
 fn escape_html(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -31,7 +35,7 @@ pub fn render_create_order_page(error: Option<&DomainError>, msg: &OrderMessages
         Some(e) => format!(
             "<div data-testid='error-banner'>{}: {}</div>",
             escape_html(&e.code),
-            escape_html(&e.message)
+            escape_html(localized_error(msg, e))
         ),
         None => String::new(),
     };
@@ -61,7 +65,7 @@ pub fn render_order_detail_page(order: &OrderSummaryDto, error: Option<&DomainEr
         Some(e) => format!(
             "<div data-testid='error-banner'>{}: {}</div>",
             escape_html(&e.code),
-            escape_html(&e.message)
+            escape_html(localized_error(msg, e))
         ),
         None => String::new(),
     };
@@ -147,7 +151,7 @@ pub fn handle_http_request<U: OrderUseCases>(
                             &format!(
                                 "<div data-testid='error-banner'>{}: {}</div>",
                                 escape_html(&e.code),
-                                escape_html(&e.message)
+                                escape_html(localized_error(msg, &e))
                             ),
                         ),
                     ),
@@ -156,7 +160,11 @@ pub fn handle_http_request<U: OrderUseCases>(
         }
         return (
             404,
-            layout(msg.locale, msg.not_found_title, "<p data-testid='not-found'>Page Not Found</p>"),
+            layout(
+                msg.locale,
+                msg.not_found_title,
+                &format!("<p data-testid='not-found'>{}</p>", escape_html(msg.not_found_body)),
+            ),
         );
     }
 
@@ -198,7 +206,7 @@ pub fn handle_http_request<U: OrderUseCases>(
                                 &format!(
                                     "<div data-testid='error-banner'>{}: {}</div>",
                                     escape_html(&e.code),
-                                    escape_html(&e.message)
+                                    escape_html(localized_error(msg, &e))
                                 ),
                             ),
                         ),
@@ -218,7 +226,7 @@ pub fn handle_http_request<U: OrderUseCases>(
                                 &format!(
                                     "<div data-testid='error-banner'>{}: {}</div>",
                                     escape_html(&e.code),
-                                    escape_html(&e.message)
+                                    escape_html(localized_error(msg, &e))
                                 ),
                             ),
                         ),
@@ -230,7 +238,11 @@ pub fn handle_http_request<U: OrderUseCases>(
 
     (
         404,
-        layout(msg.locale, msg.not_found_title, "<p data-testid='not-found'>Page Not Found</p>"),
+        layout(
+            msg.locale,
+            msg.not_found_title,
+            &format!("<p data-testid='not-found'>{}</p>", escape_html(msg.not_found_body)),
+        ),
     )
 }
 

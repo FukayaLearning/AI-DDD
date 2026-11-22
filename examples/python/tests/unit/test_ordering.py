@@ -315,7 +315,7 @@ class TestPythonOrderingDDD(unittest.TestCase):
                         {"type": "fill", "selector": "input[name='productId']", "value": "BOOK-A"},
                         {"type": "fill", "selector": "select[name='currency']", "value": "USD"},
                         {"type": "click", "selector": "[data-testid='place-order-btn']"},
-                        {"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "EMPTY_ORDER_LINES: invalid lines"},
+                        {"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "EMPTY_ORDER_LINES: Order must contain at least one line"},
                     ]),
                 ],
                 check=True,
@@ -351,7 +351,7 @@ class TestPythonOrderingDDD(unittest.TestCase):
                     json.dumps([
                         {"type": "goto", "url": f"{base_url}/orders/ORD-WEB-1"},
                         {"type": "click", "selector": "[data-testid='confirm-btn']"},
-                        {"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "INSUFFICIENT_STOCK: out of stock"},
+                        {"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "INSUFFICIENT_STOCK: Insufficient stock"},
                     ]),
                 ],
                 check=True,
@@ -385,7 +385,7 @@ class TestPythonOrderingDDD(unittest.TestCase):
                     json.dumps([
                         {"type": "goto", "url": f"{base_url}/orders/ORD-WEB-1"},
                         {"type": "click", "selector": "[data-testid='cancel-btn']"},
-                        {"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "REPOSITORY_ERROR: db busy"},
+                        {"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "REPOSITORY_ERROR: Failed to access order storage"},
                     ]),
                 ],
                 check=True,
@@ -418,9 +418,23 @@ class TestPythonOrderingDDD(unittest.TestCase):
                     str(ROOT / "scripts" / "browser_driver.mjs"),
                     json.dumps([
                         {"type": "goto", "url": f"{base_url}/orders/UNKNOWN"},
-                        {"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "ORDER_NOT_FOUND: missing"},
+                        {"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "ORDER_NOT_FOUND: Order not found"},
                         {"type": "goto", "url": f"{base_url}/not-exist"},
                         {"type": "assertText", "selector": "[data-testid='not-found']", "expected": "Page Not Found"},
+                    ]),
+                ],
+                check=True,
+                timeout=25,
+            )
+
+            uc.get_res = Err(DomainError("UNKNOWN_CODE", "raw fallback"))
+            subprocess.run(
+                [
+                    "node",
+                    str(ROOT / "scripts" / "browser_driver.mjs"),
+                    json.dumps([
+                        {"type": "goto", "url": f"{base_url}/orders/ORD-WEB-1"},
+                        {"type": "assertText", "selector": "[data-testid='error-banner']", "expected": "UNKNOWN_CODE: raw fallback"},
                     ]),
                 ],
                 check=True,
@@ -446,15 +460,26 @@ class TestPythonOrderingDDD(unittest.TestCase):
             self.assertEqual(cm4.exception.code, 404)
 
         from src.presentation.web.i18n.ja import MESSAGES as JA_MESSAGES
+
+        uc.get_res = Ok(dto_draft)
         with run_order_web_server(uc, 0, JA_MESSAGES) as ja_url:
             subprocess.run(
                 [
                     "node",
                     str(ROOT / "scripts" / "browser_driver.mjs"),
                     json.dumps([
-                        {"url": f"{ja_url}/", "selector": "h1", "expected": "注文作成"},
-                        {"url": f"{ja_url}/", "selector": "[data-testid='place-order-btn']", "expected": "注文を確定する"},
+                        {"type": "goto", "url": f"{ja_url}/"},
+                        {"type": "assertAttr", "selector": "html", "attr": "lang", "expected": "ja"},
+                        {"type": "assertText", "selector": "h1", "expected": "注文作成"},
+                        {"type": "assertText", "selector": "[data-testid='place-order-btn']", "expected": "注文を確定する"},
+                        {"type": "goto", "url": f"{ja_url}/orders/ORD-WEB-1"},
+                        {"type": "assertAttr", "selector": "html", "attr": "lang", "expected": "ja"},
+                        {"type": "assertText", "selector": "h1", "expected": "注文 ORD-WEB-1"},
+                        {"type": "assertText", "selector": "[data-testid='confirm-btn']", "expected": "注文承認"},
+                        {"type": "goto", "url": f"{ja_url}/not-exist"},
+                        {"type": "assertText", "selector": "[data-testid='not-found']", "expected": "ページが見つかりません"},
                     ]),
                 ],
                 check=True,
+                timeout=25,
             )

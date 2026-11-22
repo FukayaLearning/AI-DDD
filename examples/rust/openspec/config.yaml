@@ -2,9 +2,10 @@ schema: ddd-driven
 
 context: |
   Project: ordering_rs
-  Bounded Context: ordering (1 repository = 1 Bounded Context; cross-repo OpenSpec linking is T.B.D.)
+  Bounded Context: ordering (ORD, 1 repository = 1 Bounded Context; cross-repo OpenSpec linking is T.B.D.)
   Language: rust
   Distribution: binary
+  Localization: Master=en, User=ja (author English masters first; place change translations under i18n/ja/ and sibling <basename>.ja.md for persistent docs; Web UI renders in ja)
   Error Handling: Result<T, E> everywhere for expected domain and infrastructure failures
   Layer Architecture: Layer-first 4-layer DDD (domain, application, infrastructure, presentation) + main composition root
   Testing & Coverage:

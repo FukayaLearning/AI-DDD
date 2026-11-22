@@ -136,7 +136,7 @@ artifacts:
          - Delegate mechanical build/test/coverage runs to a lightweight execution subagent (`flash`/`flash_lite`).
          - Delegate final review to a **zero-context independent high-capability subagent (`pro`)** inspecting artifacts directly without inheriting authoring history.
       7. **Git Workflow (skip if not under Git control)**:
-         - Before task 1 in `openspec-apply`, confirm working-branch creation with the user and commit post-propose planning artifacts (`proposal.md`, `specs/`, `design.md`, `tasks.md`) to that branch.
+         - Before task 1 in `openspec-apply`, confirm working-branch creation with the user and commit post-propose planning artifacts (`proposal.md`, `specs/`, `design.md`, `test-plan.md`, `tasks.md`) to that branch.
          - Commit once per completed task immediately after verification and marking `[x]`.
     requires:
       - specs
@@ -155,5 +155,5 @@ apply:
 
     Git Workflow (when inside a Git repository; skip if not under Git control):
     - Check Git Status First: Verify whether the repository is under Git version control (e.g., `git rev-parse --is-inside-work-tree`). If not under Git control, omit all Git steps below.
-    - Pre-Task Branching & Baseline Commit (Post-Propose State): Before executing the first pending task in `openspec-apply`, ask the user about creating/switching to a working branch (confirming the branch name, e.g., `feat/<change-name>`), check out that branch, and commit the pre-task state (the post-propose planning artifacts: `proposal.md`, `specs/`, `design.md`, `tasks.md`) before starting Task 1.
+    - Pre-Task Branching & Baseline Commit (Post-Propose State): Before executing the first pending task in `openspec-apply`, ask the user about creating/switching to a working branch (confirming the branch name, e.g., `feat/<change-name>`), check out that branch, and commit the pre-task state (the post-propose planning artifacts: `proposal.md`, `specs/`, `design.md`, `test-plan.md`, `tasks.md`) before starting Task 1.
     - Per-Task Atomic Commit: Upon completing each individual task (after implementation, verification, and updating `- [ ]` to `- [x]` in `tasks.md`), immediately create a Git commit for that single task (including the updated `tasks.md`) before starting the next task.

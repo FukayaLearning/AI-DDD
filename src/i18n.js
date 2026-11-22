@@ -104,13 +104,18 @@ function isSiblingTranslation(rel) {
 export function verifyTranslations(absTarget, userLocale) {
   const errors = [];
 
-  const checkTranslation = (transAbs) => {
+  const checkTranslation = (transAbs, expectedLocale) => {
     const rel = path.relative(absTarget, transAbs).replace(/\\/g, "/");
     const content = fs.readFileSync(transAbs, "utf8");
     const header = parseTranslationHeader(content);
     if (!header) {
       errors.push(`[Missing Translation Header] ${rel}: missing ai-ddd-translation metadata comment`);
       return;
+    }
+    if (expectedLocale && header.locale.toLowerCase() !== expectedLocale.toLowerCase()) {
+      errors.push(
+        `[Translation Locale Mismatch] ${rel}: header locale '${header.locale}' does not match path locale '${expectedLocale}'`
+      );
     }
     const masterAbs = path.resolve(path.dirname(transAbs), header.source);
     if (!fs.existsSync(masterAbs)) {
@@ -130,8 +135,9 @@ export function verifyTranslations(absTarget, userLocale) {
   for (const sub of ["docs/domain", "docs/testing", "openspec/specs"]) {
     for (const file of listMarkdownFiles(path.join(absTarget, sub))) {
       const rel = path.relative(absTarget, file).replace(/\\/g, "/");
-      if (isSiblingTranslation(rel)) {
-        checkTranslation(file);
+      const m = rel.match(/\.([a-zA-Z]{2,3}(?:-[a-zA-Z0-9]+)*)\.md$/);
+      if (m) {
+        checkTranslation(file, m[1]);
       } else {
         persistentMasters.push(file);
       }
@@ -147,8 +153,9 @@ export function verifyTranslations(absTarget, userLocale) {
       const changeDir = path.join(changesRoot, entry.name);
       for (const file of listMarkdownFiles(changeDir)) {
         const relFromChange = path.relative(changeDir, file).replace(/\\/g, "/");
-        if (relFromChange.startsWith("i18n/")) {
-          checkTranslation(file);
+        const i18nMatch = relFromChange.match(/^i18n\/([^/]+)\//);
+        if (i18nMatch) {
+          checkTranslation(file, i18nMatch[1]);
         } else if (
           relFromChange === "proposal.md" ||
           relFromChange === "design.md" ||
@@ -239,7 +246,11 @@ export function verifyUiCatalogs(absTarget, userLocale) {
     }
 
     const enFile = localeFiles.get("en");
-    if (!enFile) continue;
+    if (!enFile) {
+      const relDir = path.relative(absTarget, i18nDir).replace(/\\/g, "/");
+      errors.push(`[Missing UI Catalog] ${relDir}: master 'en' catalog is required`);
+      continue;
+    }
     const enKeys = extractCatalogKeys(fs.readFileSync(enFile, "utf8"));
 
     for (const [loc, filePath] of localeFiles.entries()) {

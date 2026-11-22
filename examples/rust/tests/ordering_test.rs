@@ -394,7 +394,7 @@ fn presentation_browser_all_branches() {
 
     // 1. Place invalid order -> 422 error banner
     run_browser(format!(
-        r#"[{{"type":"goto","url":"{}/"}},{{"type":"fill","selector":"input[name='orderId']","value":"ORD-WEB-1"}},{{"type":"fill","selector":"input[name='customerId']","value":"CUST-9"}},{{"type":"fill","selector":"input[name='productId']","value":"BOOK-A"}},{{"type":"fill","selector":"select[name='currency']","value":"USD"}},{{"type":"click","selector":"[data-testid='place-order-btn']"}},{{"type":"assertText","selector":"[data-testid='error-banner']","expected":"EMPTY_ORDER_LINES: invalid lines"}}]"#,
+        r#"[{{"type":"goto","url":"{}/"}},{{"type":"fill","selector":"input[name='orderId']","value":"ORD-WEB-1"}},{{"type":"fill","selector":"input[name='customerId']","value":"CUST-9"}},{{"type":"fill","selector":"input[name='productId']","value":"BOOK-A"}},{{"type":"fill","selector":"select[name='currency']","value":"USD"}},{{"type":"click","selector":"[data-testid='place-order-btn']"}},{{"type":"assertText","selector":"[data-testid='error-banner']","expected":"EMPTY_ORDER_LINES: Order must contain at least one line"}}]"#,
         base
     ));
 
@@ -408,7 +408,7 @@ fn presentation_browser_all_branches() {
     // 3. Confirm error & Confirm success
     *confirm_res.lock().unwrap() = DomainResult::Err(DomainError::new("INSUFFICIENT_STOCK", "out of stock"));
     run_browser(format!(
-        r#"[{{"type":"goto","url":"{}/orders/ORD-WEB-1"}},{{"type":"click","selector":"[data-testid='confirm-btn']"}},{{"type":"assertText","selector":"[data-testid='error-banner']","expected":"INSUFFICIENT_STOCK: out of stock"}}]"#,
+        r#"[{{"type":"goto","url":"{}/orders/ORD-WEB-1"}},{{"type":"click","selector":"[data-testid='confirm-btn']"}},{{"type":"assertText","selector":"[data-testid='error-banner']","expected":"INSUFFICIENT_STOCK: Insufficient stock"}}]"#,
         base
     ));
 
@@ -422,7 +422,7 @@ fn presentation_browser_all_branches() {
     *get_res.lock().unwrap() = DomainResult::Ok(confirmed);
     *cancel_res.lock().unwrap() = DomainResult::Err(DomainError::new("REPOSITORY_ERROR", "db busy"));
     run_browser(format!(
-        r#"[{{"type":"goto","url":"{}/orders/ORD-WEB-1"}},{{"type":"click","selector":"[data-testid='cancel-btn']"}},{{"type":"assertText","selector":"[data-testid='error-banner']","expected":"REPOSITORY_ERROR: db busy"}}]"#,
+        r#"[{{"type":"goto","url":"{}/orders/ORD-WEB-1"}},{{"type":"click","selector":"[data-testid='cancel-btn']"}},{{"type":"assertText","selector":"[data-testid='error-banner']","expected":"REPOSITORY_ERROR: Failed to access order storage"}}]"#,
         base
     ));
 
@@ -435,8 +435,14 @@ fn presentation_browser_all_branches() {
     // 5. Missing order GET/POST/404 paths
     *get_res.lock().unwrap() = DomainResult::Err(DomainError::new("ORDER_NOT_FOUND", "missing"));
     run_browser(format!(
-        r#"[{{"type":"goto","url":"{}/orders/UNKNOWN"}},{{"type":"assertText","selector":"[data-testid='error-banner']","expected":"ORDER_NOT_FOUND: missing"}},{{"type":"goto","url":"{}/not-exist"}},{{"type":"assertText","selector":"[data-testid='not-found']","expected":"Page Not Found"}}]"#,
+        r#"[{{"type":"goto","url":"{}/orders/UNKNOWN"}},{{"type":"assertText","selector":"[data-testid='error-banner']","expected":"ORDER_NOT_FOUND: Order not found"}},{{"type":"goto","url":"{}/not-exist"}},{{"type":"assertText","selector":"[data-testid='not-found']","expected":"Page Not Found"}}]"#,
         base, base
+    ));
+
+    *get_res.lock().unwrap() = DomainResult::Err(DomainError::new("UNKNOWN_CODE", "raw fallback"));
+    run_browser(format!(
+        r#"[{{"type":"goto","url":"{}/orders/ORD-WEB-1"}},{{"type":"assertText","selector":"[data-testid='error-banner']","expected":"UNKNOWN_CODE: raw fallback"}}]"#,
+        base
     ));
 
     *confirm_res.lock().unwrap() = DomainResult::Err(DomainError::new("ORDER_NOT_FOUND", "missing"));
@@ -450,14 +456,69 @@ fn presentation_browser_all_branches() {
     handle.join().unwrap();
 }
 
+fn run_localized_browser(
+    messages: &'static ordering_rs::presentation::web::i18n::en::OrderMessages,
+    actions_template: &str,
+) {
+    let draft = OrderSummaryDto {
+        order_id: "ORD-WEB-1".into(),
+        customer_id: "CUST-9".into(),
+        status: OrderStatus::Draft,
+        total: Money { amount: 2400, currency: Currency::JPY },
+        lines: vec![OrderLineDto {
+            product_id: "BOOK-A".into(),
+            quantity: 2,
+            unit_price: Money { amount: 1200, currency: Currency::JPY },
+        }],
+    };
+    let uc = MockWebUseCases {
+        place_res: Arc::new(Mutex::new(DomainResult::Err(DomainError::new("EMPTY_ORDER_LINES", "invalid lines")))),
+        confirm_res: Arc::new(Mutex::new(DomainResult::Err(DomainError::new("INVALID_ORDER_STATE", "bad state")))),
+        cancel_res: Arc::new(Mutex::new(DomainResult::Err(DomainError::new("INVALID_ORDER_STATE", "bad state")))),
+        get_res: Arc::new(Mutex::new(DomainResult::Ok(draft))),
+    };
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_srv = stop.clone();
+    let handle = thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            if stop_srv.load(Ordering::SeqCst) {
+                break;
+            }
+            serve_single_connection(stream, &uc, messages);
+        }
+    });
+
+    let base = format!("http://{}", addr);
+    let actions_json = actions_template.replace("{base}", &base);
+    let out = Command::new("node")
+        .args(["scripts/browser_driver.mjs", &actions_json])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    stop.store(true, Ordering::SeqCst);
+    let _ = TcpStream::connect(addr);
+    handle.join().unwrap();
+}
+
 /// UT-ORD-031
 #[test]
 fn presentation_renders_ja_and_en_catalogs() {
-    use ordering_rs::presentation::web::order::order_web_server::render_create_order_page;
-    let ja_html = render_create_order_page(None, &JA_MESSAGES);
-    assert!(ja_html.contains("<html lang='ja'>"));
-    assert!(ja_html.contains("注文作成"));
-    let en_html = render_create_order_page(None, &EN_MESSAGES);
-    assert!(en_html.contains("<html lang='en'>"));
-    assert!(en_html.contains("Place Order"));
+    run_localized_browser(
+        &JA_MESSAGES,
+        r#"[{"type":"goto","url":"{base}/"},{"type":"assertAttr","selector":"html","attr":"lang","expected":"ja"},{"type":"assertText","selector":"h1","expected":"注文作成"},{"type":"assertText","selector":"[data-testid='place-order-btn']","expected":"注文を確定する"},{"type":"goto","url":"{base}/orders/ORD-WEB-1"},{"type":"assertAttr","selector":"html","attr":"lang","expected":"ja"},{"type":"assertText","selector":"h1","expected":"注文 ORD-WEB-1"},{"type":"assertText","selector":"[data-testid='confirm-btn']","expected":"注文承認"},{"type":"goto","url":"{base}/not-exist"},{"type":"assertText","selector":"[data-testid='not-found']","expected":"ページが見つかりません"}]"#,
+    );
+
+    run_localized_browser(
+        &EN_MESSAGES,
+        r#"[{"type":"goto","url":"{base}/"},{"type":"assertAttr","selector":"html","attr":"lang","expected":"en"},{"type":"assertText","selector":"h1","expected":"Place Order"},{"type":"goto","url":"{base}/orders/ORD-WEB-1"},{"type":"assertAttr","selector":"html","attr":"lang","expected":"en"},{"type":"assertText","selector":"h1","expected":"Order ORD-WEB-1"},{"type":"goto","url":"{base}/not-exist"},{"type":"assertText","selector":"[data-testid='not-found']","expected":"Page Not Found"}]"#,
+    );
 }

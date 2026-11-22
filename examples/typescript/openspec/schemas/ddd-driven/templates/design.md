@@ -11,7 +11,7 @@
 - **Value Objects**: <!-- Immutable validated types returning Result<T, DomainError> -->
 - **Entities & Aggregate Roots**: <!-- Aggregate boundary, invariants, state transitions -->
 - **Domain Events**: <!-- Events emitted on aggregate state changes -->
-- **Domain Ports (Interfaces)**: <!-- OrderRepository / ACL Ports owned by domain -->
+- **Domain & Application Ports (Interfaces)**: <!-- OrderRepository owned by domain/<aggregate>/; external ACL Ports owned by application/shared/ -->
 - **Error Modeling (`Result<T, E>`)**: <!-- Exhaustive DomainError variants (no domain exceptions) -->
 
 ## 4-Layer Architecture, Module Layout & Infrastructure 3-Part Separation

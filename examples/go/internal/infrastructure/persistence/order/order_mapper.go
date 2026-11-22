@@ -1,7 +1,9 @@
 package order
 
-import domainorder "example.com/ordering-go/internal/domain/order"
+import (
+	domainorder "example.com/ordering-go/internal/domain/order"
 	"example.com/ordering-go/internal/domain/shared"
+)
 
 type OrderLineRecord struct {
 	ProductId  string          `json:"productId"`
@@ -87,7 +89,7 @@ func FromOrderRecord(rec OrderRecord) shared.Result[domainorder.Order, shared.Do
 			TotalAmount:    ev.TotalAmount,
 		}
 	}
-	orderRes := shared.CreateOrder(idRes.Value, custRes.Value, lines, rec.Status, events)
+	orderRes := domainorder.CreateOrder(idRes.Value, custRes.Value, lines, rec.Status, events)
 	if !orderRes.Ok {
 		return shared.Failure[domainorder.Order, shared.DomainError](shared.NewDomainError("REPOSITORY_ERROR", orderRes.Error.Message))
 	}

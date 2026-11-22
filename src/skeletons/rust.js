@@ -179,6 +179,16 @@ pub mod i18n;
     pub unavailable_title: &'static str,
     pub not_found_title: &'static str,
     pub not_found_body: &'static str,
+    pub error_messages: &'static [(&'static str, &'static str)],
+}
+
+impl HealthMessages {
+    pub fn error_message(&self, code: &str) -> Option<&'static str> {
+        self.error_messages
+            .iter()
+            .find(|(c, _)| *c == code)
+            .map(|(_, message)| *message)
+    }
 }
 
 pub const EN_MESSAGES: HealthMessages = HealthMessages {
@@ -187,6 +197,9 @@ pub const EN_MESSAGES: HealthMessages = HealthMessages {
     unavailable_title: "Service Unavailable",
     not_found_title: "Not Found",
     not_found_body: "Page Not Found",
+    error_messages: &[
+        ("CLOCK_UNAVAILABLE", "System clock is unavailable"),
+    ],
 };
 `;
 
@@ -200,6 +213,9 @@ pub const USER_MESSAGES: HealthMessages = HealthMessages {
     unavailable_title: ${JSON.stringify(isJa ? "サービス利用不可" : `[${locale}] Service Unavailable`)},
     not_found_title: ${JSON.stringify(isJa ? "見つかりません" : `[${locale}] Not Found`)},
     not_found_body: ${JSON.stringify(isJa ? "ページが見つかりません" : `[${locale}] Page Not Found`)},
+    error_messages: &[
+        ("CLOCK_UNAVAILABLE", ${JSON.stringify(isJa ? "システム時刻を取得できません" : `[${locale}] System clock is unavailable`)}),
+    ],
 };
 `;
     files["src/presentation/web/i18n/mod.rs"] = `pub mod en;\n#[path = "${locale}.rs"]\npub mod user;\n`;
@@ -220,6 +236,10 @@ pub fn render_html(locale: &str, title: &str, body: &str) -> String {
     )
 }
 
+fn localized_error<'a>(messages: &'a HealthMessages, code: &str, message: &'a str) -> &'a str {
+    messages.error_message(code).unwrap_or(message)
+}
+
 pub fn handle_http_request<U: GetHealthUseCase>(use_case: &U, request_line: &str, messages: &HealthMessages) -> (u16, String) {
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("");
@@ -231,7 +251,7 @@ pub fn handle_http_request<U: GetHealthUseCase>(use_case: &U, request_line: &str
                 render_html(
                     messages.locale,
                     messages.unavailable_title,
-                    &format!("<main><div data-testid='error-banner'>{}: {}</div></main>", e.code, e.message),
+                    &format!("<main><div data-testid='error-banner'>{}: {}</div></main>", e.code, localized_error(messages, &e.code, &e.message)),
                 ),
             ),
             DomainResult::Ok(status) => (
@@ -257,12 +277,12 @@ pub fn handle_http_request<U: GetHealthUseCase>(use_case: &U, request_line: &str
     )
 }
 
-pub fn serve_single_connection<U: GetHealthUseCase>(mut stream: TcpStream, use_case: &U) {
+pub fn serve_single_connection<U: GetHealthUseCase>(mut stream: TcpStream, use_case: &U, messages: &HealthMessages) {
     let mut buf = [0u8; 2048];
     let n = stream.read(&mut buf).unwrap_or(0);
     let req_str = String::from_utf8_lossy(&buf[..n]);
     let first_line = req_str.lines().next().unwrap_or("");
-    let (status_code, html) = handle_http_request(use_case, first_line, &EN_MESSAGES);
+    let (status_code, html) = handle_http_request(use_case, first_line, messages);
     let status_text = match status_code {
         200 => "OK",
         503 => "Service Unavailable",
@@ -285,10 +305,20 @@ pub mod infrastructure;
 pub mod presentation;
 `;
 
+  const rsMainImport =
+    locale !== "en"
+      ? `use ${crateName}::presentation::web::i18n::en::EN_MESSAGES;\nuse ${crateName}::presentation::web::i18n::user::USER_MESSAGES;`
+      : `use ${crateName}::presentation::web::i18n::en::EN_MESSAGES;`;
+  const rsMainMsg =
+    locale !== "en"
+      ? `    let app_locale = std::env::var("APP_LOCALE").unwrap_or_else(|_| ${JSON.stringify(locale)}.to_string());\n    let messages = if app_locale == "en" { &EN_MESSAGES } else { &USER_MESSAGES };`
+      : `    let messages = &EN_MESSAGES;`;
+
   files["src/main.rs"] = `use ${crateName}::application::health::queries::get_health::CheckHealthService;
 use ${crateName}::infrastructure::drivers::clock::clock_driver::SystemClockDriver;
 use ${crateName}::infrastructure::persistence::health::system_clock_adapter::SystemClockAdapter;
 use ${crateName}::presentation::web::health::web_server::serve_single_connection;
+${rsMainImport}
 use std::net::TcpListener;
 
 pub fn create_app(context_name: &str) -> CheckHealthService<SystemClockAdapter<SystemClockDriver>> {
@@ -303,8 +333,9 @@ fn main() {
     let addr = listener.local_addr().expect("addr failed");
     println!("LISTENING http://{}", addr);
     let uc = create_app("${contextName}");
+${rsMainMsg}
     for stream in listener.incoming().flatten() {
-        serve_single_connection(stream, &uc);
+        serve_single_connection(stream, &uc, messages);
     }
 }
 `;
@@ -431,6 +462,7 @@ use ${crateName}::infrastructure::drivers::clock::clock_driver::RawClockDriver;
 use ${crateName}::infrastructure::persistence::health::clock_mapper::map_epoch_seconds;
 use ${crateName}::infrastructure::persistence::health::system_clock_adapter::SystemClockAdapter;
 use ${crateName}::presentation::web::health::web_server::serve_single_connection;
+use ${crateName}::presentation::web::i18n::en::EN_MESSAGES;${locale !== "en" ? `\nuse ${crateName}::presentation::web::i18n::user::USER_MESSAGES;` : ""}
 use std::net::TcpListener;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -498,7 +530,7 @@ fn presentation_browser_all_branches() {
     let handle = thread::spawn(move || {
         for _ in 0..3 {
             if let Ok((stream, _)) = listener.accept() {
-                serve_single_connection(stream, &uc);
+                serve_single_connection(stream, &uc, &EN_MESSAGES);
             }
         }
     });
@@ -515,13 +547,25 @@ fn presentation_browser_all_branches() {
         message: "mock outage".to_string(),
     });
     let scenarios_err = format!(
-        r#"[{{"url":"http://{}/","selector":"[data-testid='error-banner']","expected":"CLOCK_UNAVAILABLE: mock outage"}},{{"url":"http://{}/missing","selector":"[data-testid='not-found']","expected":"Page Not Found"}}]"#,
+        r#"[{{"url":"http://{}/","selector":"[data-testid='error-banner']","expected":"CLOCK_UNAVAILABLE: System clock is unavailable"}},{{"url":"http://{}/missing","selector":"[data-testid='not-found']","expected":"Page Not Found"}}]"#,
         addr, addr
     );
     let out_err = Command::new("node").args(["scripts/browser_driver.mjs", &scenarios_err]).output().unwrap();
     assert!(out_err.status.success(), "{}", String::from_utf8_lossy(&out_err.stderr));
 
-    handle.join().unwrap();
+    handle.join().unwrap();${locale !== "en" ? `
+    let l2 = TcpListener::bind("127.0.0.1:0").unwrap();
+    let a2 = l2.local_addr().unwrap();
+    let uc2 = MockUseCase { next: state.clone() };
+    let h2 = thread::spawn(move || {
+        if let Ok((stream, _)) = l2.accept() {
+            serve_single_connection(stream, &uc2, &USER_MESSAGES);
+        }
+    });
+    let loc_s = format!(r#"[{{"url":"http://{}/missing","selector":"[data-testid='not-found']","expected":"{}"}}]"#, a2, USER_MESSAGES.not_found_body);
+    let out_loc = Command::new("node").args(["scripts/browser_driver.mjs", &loc_s]).output().unwrap();
+    assert!(out_loc.status.success(), "{}", String::from_utf8_lossy(&out_loc.stderr));
+    h2.join().unwrap();` : ""}
 }
 `;
 

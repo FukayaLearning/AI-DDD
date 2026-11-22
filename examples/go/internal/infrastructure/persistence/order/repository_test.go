@@ -41,7 +41,7 @@ func TestUT_ORD_014_MapperAndRepository(t *testing.T) {
 	pid := shared.CreateProductId("P1").Value
 	qty := shared.CreateQuantity(2).Value
 	price := shared.CreateMoney(100, shared.CurrencyJPY).Value
-	order := shared.CreateOrder(oid, cid, []domainorder.OrderLine{{ProductId: pid, Quantity: qty, UnitPrice: price}}, shared.StatusDraft, nil).Value.Confirm().Value
+	order := domainorder.CreateOrder(oid, cid, []domainorder.OrderLine{{ProductId: pid, Quantity: qty, UnitPrice: price}}, domainorder.StatusDraft, nil).Value.Confirm().Value
 
 	rec := persistence.ToOrderRecord(order)
 	if !persistence.FromOrderRecord(rec).Ok {
