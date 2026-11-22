@@ -353,36 +353,55 @@ const wsUrl = await new Promise((resolve, reject) => {
 });
 
 const ws = new WebSocket(wsUrl);
-await new Promise((r) => ws.addEventListener("open", r, { once: true }));
+await new Promise((r, j) => {
+  const t = setTimeout(() => j(new Error("WebSocket open timeout")), 10000);
+  ws.addEventListener("open", () => { clearTimeout(t); r(); }, { once: true });
+  ws.addEventListener("error", (e) => { clearTimeout(t); j(e); }, { once: true });
+});
 let nid = 1;
 const pend = new Map();
 ws.addEventListener("message", (ev) => {
   const m = JSON.parse(ev.data);
   if (m.id && pend.has(m.id)) {
-    const { resolve, reject } = pend.get(m.id);
+    const { resolve, reject, timer } = pend.get(m.id);
+    clearTimeout(timer);
     pend.delete(m.id);
     if (m.error) reject(new Error(m.error.message));
     else resolve(m.result);
   }
 });
+ws.addEventListener("close", () => {
+  for (const [, entry] of pend) {
+    clearTimeout(entry.timer);
+    entry.reject(new Error("WebSocket closed"));
+  }
+  pend.clear();
+});
 const send = (method, params = {}, sessionId = undefined) => {
   const id = nid++;
   return new Promise((resolve, reject) => {
-    pend.set(id, { resolve, reject });
+    const timer = setTimeout(() => {
+      pend.delete(id);
+      reject(new Error(\`CDP timeout on \${method}\`));
+    }, 10000);
+    pend.set(id, { resolve, reject, timer });
     ws.send(JSON.stringify(sessionId ? { id, method, params, sessionId } : { id, method, params }));
   });
 };
 
+let exitCode = 0;
 try {
   const { targetId } = await send("Target.createTarget", { url: "about:blank" });
   const { sessionId } = await send("Target.attachToTarget", { targetId, flatten: true });
   await send("Page.enable", {}, sessionId);
   await send("Runtime.enable", {}, sessionId);
   for (const s of scenarios) {
-    const loaded = new Promise((r) => {
+    const loaded = new Promise((r, j) => {
+      const t = setTimeout(() => { ws.removeEventListener("message", h); j(new Error("Load timeout")); }, 10000);
       const h = (ev) => {
         const m = JSON.parse(ev.data);
         if (m.sessionId === sessionId && m.method === "Page.loadEventFired") {
+          clearTimeout(t);
           ws.removeEventListener("message", h);
           r();
         }
@@ -397,14 +416,20 @@ try {
     }, sessionId);
     assert.equal(res.result?.value ?? null, s.expected);
   }
+} catch (err) {
+  console.error(err);
+  exitCode = 1;
 } finally {
-  try { await send("Browser.close"); } catch {}
   try { ws.close(); } catch {}
   if (proc.exitCode === null) {
     proc.kill("SIGKILL");
-    await new Promise((r) => proc.once("exit", r));
+    await Promise.race([
+      new Promise((r) => proc.once("exit", r)),
+      new Promise((r) => setTimeout(r, 500)),
+    ]);
   }
   try { fs.rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); } catch {}
+  process.exit(exitCode);
 }
 `;
 

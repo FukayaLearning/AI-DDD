@@ -1,0 +1,120 @@
+name: ddd-driven
+version: 1
+description: OpenSpec + DDD 4-stage workflow (proposal -> specs -> design -> tasks) with 1-repo-1-Bounded-Context, Result<T, E>, 3-part Infrastructure, Mock+Playwright C1 100% coverage, and 3-role multi-agent orchestration.
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: Initial proposal establishing WHY the change is needed and its Bounded Context / Ubiquitous Language impact
+    template: proposal.md
+    instruction: |
+      Create the proposal document that establishes WHY this change is needed within this repository's single Bounded Context.
+
+      Strategic DDD Rule (1 Repository = 1 Bounded Context):
+      - This repository owns exactly ONE Bounded Context. External contexts reside in separate repositories (cross-repo OpenSpec linking is T.B.D.).
+      - Check `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md` before drafting.
+      - Record any new or modified Ubiquitous Language terms so all specs, code, and tests use identical terminology.
+
+      Sections:
+      - **Why**: 1-2 sentences on the domain problem or business opportunity.
+      - **Bounded Context & Ubiquitous Language**: State the single Bounded Context owned by this repo and list new/updated domain terms (exact English identifiers + Japanese/domain definitions).
+      - **What Changes**: Bullet list of changes. Mark breaking changes with **BREAKING**.
+      - **Capabilities**:
+        - **New Capabilities**: List capabilities as `<bounded-context>/<capability>` (kebab-case) matching `openspec/specs/<bounded-context>/<capability>/spec.md`.
+        - **Modified Capabilities**: List existing capabilities whose requirements change (exact existing path from `openspec list --specs`).
+      - **Impact**: Affected domain models, ports, drivers, Web UI routes, and distribution artifacts.
+
+      Every change must either declare at least one capability or set `skip_specs: true` in `.openspec.yaml`.
+      Research existing specs first with `openspec list --specs` and `openspec show "<spec-id>" --type spec`.
+    requires: []
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: Detailed behavior specifications organized under <bounded-context>/<capability>
+    template: spec.md
+    instruction: |
+      Create specification files defining WHAT the Bounded Context must do, expressed strictly in Ubiquitous Language.
+
+      Directory & Naming:
+      - Organize specs under `specs/<bounded-context>/<capability>/spec.md` (matching the proposal's Capabilities section).
+      - Each `#### Scenario:` corresponds 1-to-1 with Application layer UseCase tests (normal and abnormal paths) and Presentation Web UI flow tests.
+
+      Formatting rules (required for `openspec validate --strict`):
+      - New capabilities MUST start with `## Purpose` (50+ characters). Do NOT include `## Purpose` for modified capabilities.
+      - Use delta headers: `## ADDED Requirements`, `## MODIFIED Requirements`, `## REMOVED Requirements`, `## RENAMED Requirements`.
+      - Each requirement: `### Requirement: <name>` using SHALL/MUST (keep description <= 500 chars).
+      - Each scenario MUST use exactly 4 hashtags (`#### Scenario: <name>`) with `- **GIVEN**`/`- **WHEN**` and `- **THEN**` steps.
+      - Avoid internal class names, framework names, or SQL/HTTP details in specs; keep specs behavior-focused and testable.
+    requires:
+      - proposal
+
+  - id: design
+    generates: design.md
+    description: Strategic/Tactical DDD architecture, Infrastructure 3-part split, C1 100% exclusion plan, and Integration test plan
+    template: design.md
+    instruction: |
+      Create `design.md` explaining HOW the change is realized using Tactical DDD and C1 100% coverage governance.
+
+      Mandatory DDD & Verification Design Rules:
+      1. **Strategic DDD Alignment**:
+         - Confirm sync with `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md`.
+         - External Bounded Context integrations remain in separate repositories (mark cross-repo spec federation as `T.B.D.`).
+      2. **Tactical Domain Model & Result<T, E>**:
+         - Specify Value Objects, Entities, Aggregate Roots (invariants), Domain Events, Domain Services, and Repository/ACL Ports.
+         - Model ALL expected domain and infrastructure failures using `Result<T, E>` (no throwing domain exceptions for business or I/O errors), so every error path is an explicit C1 branch.
+      3. **Layer-First 4-Layer Architecture**:
+         - `domain`: Zero dependencies on outer layers or I/O libraries.
+         - `application`: UseCases taking Repository/ACL ports via DI, returning `Result<T, E>`. Depends only on `domain`.
+         - `infrastructure`: MUST be separated into 3 distinct parts:
+           a) **Pure Mapper / ACL Converters**: Side-effect free, 100% C1 unit-testable without mocks.
+           b) **Minimal I/O Drivers (`infrastructure/drivers/`)**: Raw DB/HTTP calls ONLY. **FORBIDDEN to contain `if`/`switch`/`match`/ternary business or error-classification branches.**
+           c) **Repository / Gateway Implementations**: Inject `drivers/` interfaces via DI, map raw driver responses/errors (timeout, conflict, unavailable) to `Result<T, E>`, achieving 100% C1 unit-test coverage via mock drivers.
+         - `presentation`: Web UI / HTTP SSR handlers taking Application UseCases via DI (never directly importing `infrastructure`). Tested via **Mock UseCase + Playwright/Headless Chromium** covering all rendering/form/error branches to directly measure Presentation C1 coverage.
+         - `main`: Composition root wiring real drivers, repositories, use cases, and presentation handlers.
+      4. **Unit-Test Exclusions & C1 100% Governance**:
+         - ONLY `infrastructure/drivers/` and `main` may be excluded from unit-test C1 coverage (configured centrally in one config file; inline ignore comments like `v8 ignore`, `istanbul ignore`, `pragma: no cover`, `#[coverage(off)]` are strictly forbidden).
+         - Explicitly list every excluded file in `design.md` with justification.
+         - Everything outside exclusions MUST achieve **100% C1 (branch) coverage**.
+      5. **Distribution & Integration Test Plan**:
+         - State distribution target (`docker`, `binary`, or `library`) and how excluded `infrastructure/drivers/` and `main` are verified in integration tests.
+    requires:
+      - proposal
+
+  - id: tasks
+    generates: tasks.md
+    description: TDD-ordered implementation checklist enforcing C1 100%, browser tests, integration tests, and 3-role review
+    template: tasks.md
+    instruction: |
+      Break down work into tracked `- [ ] X.Y ...` tasks ordered strictly by TDD and DDD layers.
+
+      Mandatory Task Groups & Sequence:
+      1. **Strategic Docs & Domain Layer TDD (100% C1)**:
+         - Sync `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md`.
+         - Write Domain unit tests (Value Objects, Aggregate invariants, `Result` error variants, Domain Events) first, then implement Domain until tests pass with 100% C1 branch coverage.
+      2. **Infrastructure Layer 3-Part TDD (100% C1 outside `drivers/`)**:
+         - Implement pure Mapper/ACL converters and unit test all branches.
+         - Define minimal branchless `drivers/` interface & raw driver implementation (no `if/switch/match`).
+         - Write Repository/ACL unit tests with mock drivers covering all abnormal paths (timeouts, declined/conflict, invalid payloads, storage errors) first, then implement Repository/ACL to 100% C1.
+      3. **Application Layer Scenario TDD (100% C1)**:
+         - Map each OpenSpec `#### Scenario:` 1-to-1 to an Application UseCase test using DI-injected mock Repository/ACL ports, then implement UseCases to 100% C1.
+      4. **Presentation Layer Mock x Playwright Web UI TDD (100% C1)**:
+         - Launch the real Presentation Web server with DI-injected Mock UseCases under coverage instrumentation.
+         - Execute Playwright/headless Chromium tests across every normal, validation-error, domain-error, system-error, and 404 branch, asserting rendered DOM and 100% Presentation C1 branch coverage.
+      5. **Distribution & Integration Verification**:
+         - Run `ai-ddd verify` (layer dependencies, zero inline coverage ignores, branchless `drivers/`).
+         - Run distribution-specific integration test (`docker` / `binary` / `library`) verifying `drivers/` + `main`.
+      6. **Multi-Agent Execution & Zero-Context Review**:
+         - Delegate mechanical build/test/coverage runs to a lightweight execution subagent (`flash`/`flash_lite`).
+         - Delegate final review to a **zero-context independent high-capability subagent (`pro`)** inspecting artifacts directly without inheriting authoring history.
+    requires:
+      - specs
+      - design
+
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    Follow the 3-role multi-agent workflow:
+    - Main Agent: Author and refine specifications, DDD 4-layer code, and tests within a single consistent context.
+    - Execution Subagent (lightweight model): Run builds, `ai-ddd verify`, unit + Mock*Playwright tests, C1 100% coverage reports, and integration tests.
+    - Review Subagent (high-capability model, ZERO prior conversation context): Independently audit spec-to-code alignment, Ubiquitous Language consistency, and C1 governance compliance from saved files only.
+    Mark tasks `[x]` only after verification passes.

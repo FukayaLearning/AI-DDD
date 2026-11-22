@@ -1,0 +1,15 @@
+[project]
+name = "ordering-py"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = ["src/infrastructure/drivers/*", "src/main.py"]
+
+[tool.coverage.report]
+fail_under = 100

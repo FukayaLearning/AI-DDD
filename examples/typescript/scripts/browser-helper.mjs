@@ -45,12 +45,17 @@ export async function launchHeadlessBrowser() {
         resolve(m[1]);
       }
     });
+    proc.once("exit", (code) => {
+      clearTimeout(timer);
+      reject(new Error(`Chromium exited prematurely (${code}): ${stderr}`));
+    });
   });
 
   const ws = new WebSocket(wsUrl);
   await new Promise((resolve, reject) => {
-    ws.addEventListener("open", () => resolve(), { once: true });
-    ws.addEventListener("error", (e) => reject(e), { once: true });
+    const timer = setTimeout(() => reject(new Error("WebSocket open timeout")), 10000);
+    ws.addEventListener("open", () => { clearTimeout(timer); resolve(); }, { once: true });
+    ws.addEventListener("error", (e) => { clearTimeout(timer); reject(e); }, { once: true });
   });
 
   let nextId = 1;
@@ -58,18 +63,30 @@ export async function launchHeadlessBrowser() {
   ws.addEventListener("message", (event) => {
     const msg = JSON.parse(event.data);
     if (msg.id && pending.has(msg.id)) {
-      const { resolve, reject } = pending.get(msg.id);
+      const { resolve, reject, timer } = pending.get(msg.id);
+      clearTimeout(timer);
       pending.delete(msg.id);
       if (msg.error) reject(new Error(msg.error.message));
       else resolve(msg.result);
     }
+  });
+  ws.addEventListener("close", () => {
+    for (const [, entry] of pending) {
+      clearTimeout(entry.timer);
+      entry.reject(new Error("WebSocket closed"));
+    }
+    pending.clear();
   });
 
   function send(method, params = {}, sessionId = undefined) {
     const id = nextId++;
     const payload = sessionId ? { id, method, params, sessionId } : { id, method, params };
     return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(`CDP timeout on ${method}`));
+      }, 10000);
+      pending.set(id, { resolve, reject, timer });
       ws.send(JSON.stringify(payload));
     });
   }
@@ -80,10 +97,15 @@ export async function launchHeadlessBrowser() {
   await send("Runtime.enable", {}, sessionId);
 
   function waitForLoad() {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        ws.removeEventListener("message", listener);
+        reject(new Error("Page.loadEventFired timeout"));
+      }, 10000);
       const listener = (event) => {
         const msg = JSON.parse(event.data);
         if (msg.sessionId === sessionId && msg.method === "Page.loadEventFired") {
+          clearTimeout(timer);
           ws.removeEventListener("message", listener);
           resolve();
         }
@@ -143,11 +165,13 @@ export async function launchHeadlessBrowser() {
       return res.result?.value ?? null;
     },
     async close() {
-      try { await send("Browser.close"); } catch {}
       try { ws.close(); } catch {}
       if (proc.exitCode === null) {
         proc.kill("SIGKILL");
-        await new Promise((r) => proc.once("exit", r));
+        await Promise.race([
+          new Promise((r) => proc.once("exit", r)),
+          new Promise((r) => setTimeout(r, 500)),
+        ]);
       }
       try { fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); } catch {}
     },
