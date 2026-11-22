@@ -1,0 +1,11 @@
+{
+  "name": "ordering-ts",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "verify": "node ../../bin/ai-ddd.js verify --target .",
+    "test:unit": "node --experimental-strip-types scripts/run-c1-coverage.mjs",
+    "test:integration": "bash scripts/test-integration.sh",
+    "test": "npm run verify && npm run test:unit && npm run test:integration"
+  }
+}

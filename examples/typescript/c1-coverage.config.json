@@ -1,0 +1,8 @@
+{
+  "language": "typescript",
+  "branchThreshold": 100,
+  "exclude": [
+    "src/infrastructure/drivers/**",
+    "src/main.ts"
+  ]
+}
