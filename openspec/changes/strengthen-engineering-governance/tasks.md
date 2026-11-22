@@ -8,7 +8,7 @@
 
 ## 2. スキーマ v2・テンプレート・スキル
 
-- [ ] 2.1 `schemas/ddd-driven/schema.yaml` を `version: 2` とし `test-plan` 成果物（`requires: [specs, design]`）を追加、`tasks.requires` に `test-plan` を追加する。一時ディレクトリで `openspec schema validate ddd-driven` が成功し、新規変更の `openspec status --json` で依存順が仕様どおりであることを確認する
+- [x] 2.1 `schemas/ddd-driven/schema.yaml` を `version: 2` とし `test-plan` 成果物（`requires: [specs, design]`）を追加、`tasks.requires` に `test-plan` を追加する。一時ディレクトリで `openspec schema validate ddd-driven` が成功し、新規変更の `openspec status --json` で依存順が仕様どおりであることを確認する
 - [ ] 2.2 `templates/test-plan.md` を新設（Test Scope / Test Levels / Environment / Entry & Exit Criteria / Non-Functional / Abnormal-Path Checklist 7 カテゴリ / Test Case Delta）し、`spec.md` テンプレートに `REQ-`/`SCN-` 見出し記法、`design.md` にモジュール構造節、`tasks.md` に試験仕様書作成・trace check・翻訳同期の各タスクを追加する。各 instruction に英語マスター＋`i18n/<locale>/` 翻訳規約を記載し、`openspec schema validate` 成功を確認する
 - [ ] 2.3 `skills/ddd-workflow/SKILL.md` に 多言語（翻訳作成・`i18n stamp`・アーカイブ時の Translation Sync）、モジュール構造、ID 採番規約（最大値 + 1・再利用禁止）、試験仕様書作成手順（異常系チェックリスト・試験設計技法）を追記し、ルート `AGENTS.md` と `README.md` の該当説明を更新する。記載コマンド例が実在するオプションと一致することをレビューで確認する
 

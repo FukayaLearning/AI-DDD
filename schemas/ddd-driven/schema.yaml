@@ -1,6 +1,6 @@
 name: ddd-driven
-version: 1
-description: OpenSpec + DDD 4-stage workflow (proposal -> specs -> design -> tasks) with 1-repo-1-Bounded-Context, Result<T, E>, 3-part Infrastructure, Mock+Playwright C1 100% coverage, and 3-role multi-agent orchestration.
+version: 2
+description: OpenSpec + DDD 5-stage workflow (proposal -> specs -> design -> test-plan -> tasks) with 1-repo-1-Bounded-Context, Result<T, E>, 3-part Infrastructure, Mock+Playwright C1 100% coverage, and 3-role multi-agent orchestration.
 artifacts:
   - id: proposal
     generates: proposal.md
@@ -79,6 +79,25 @@ artifacts:
     requires:
       - proposal
 
+  - id: test-plan
+    generates: test-plan.md
+    description: Design-time test plan defining test scope, levels, environment, entry/exit criteria, abnormal-path checklist, and test case delta (UT/IT IDs)
+    template: test-plan.md
+    instruction: |
+      Create `test-plan.md` at DESIGN TIME (after specs and design, before tasks) so tests verify specifications and design decisions rather than merely chasing coverage.
+
+      Required sections:
+      - **Test Scope**: Capabilities, `REQ-`/`SCN-` IDs, and design elements in scope; explicitly out-of-scope items.
+      - **Test Levels & Responsibilities**: Unit (`UT-<CTX>-<NNN>`) vs Integration/E2E (`IT-<CTX>-<NNN>`) responsibilities per layer.
+      - **Environment & Test Doubles**: Mock drivers/UseCases for unit tests; stubs and distribution artifact (`docker`/`binary`/`library`) for integration tests.
+      - **Entry & Exit Criteria**: Exit requires ALL of: every test case passes, `ai-ddd trace --check` passes, and 100% C1 branch coverage outside exclusions.
+      - **Non-Functional Testing**: Whether performance/security/availability tests are needed, with rationale.
+      - **Abnormal-Path Checklist**: Per capability, address every category with IT case IDs or an explicit N/A reason.
+      - **Test Case Delta**: UT/IT IDs added, changed, or retired by this change, each tracing to `REQ-`/`SCN-` IDs or design elements.
+    requires:
+      - specs
+      - design
+
   - id: tasks
     generates: tasks.md
     description: TDD-ordered implementation checklist enforcing C1 100%, browser tests, integration tests, and 3-role review
@@ -111,6 +130,7 @@ artifacts:
     requires:
       - specs
       - design
+      - test-plan
 
 apply:
   requires: [tasks]
