@@ -19,4 +19,4 @@
 
 ## 4. End-to-End Platform Verification
 
-- [ ] 4.1 Run `openspec validate bootstrap-ai-ddd-platform --strict`, `ai-ddd verify` across all examples, and end-to-end `ai-ddd init` smoke tests in `/tmp`
+- [x] 4.1 Run `openspec validate bootstrap-ai-ddd-platform --strict`, `ai-ddd verify` across all examples, and end-to-end `ai-ddd init` smoke tests in `/tmp`
