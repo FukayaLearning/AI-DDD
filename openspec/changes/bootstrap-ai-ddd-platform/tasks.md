@@ -2,7 +2,7 @@
 
 ## 1. Custom Schema & AI Skills
 
-- [ ] 1.1 Create `schemas/ddd-driven/schema.yaml` and templates (`proposal.md`, `spec.md`, `design.md`, `tasks.md`) and verify with `openspec schema validate`
+- [x] 1.1 Create `schemas/ddd-driven/schema.yaml` and templates (`proposal.md`, `spec.md`, `design.md`, `tasks.md`) and verify with `openspec schema validate`
 - [ ] 1.2 Create `skills/ddd-workflow/SKILL.md` documenting strategic/tactical DDD, C1 100% rules, and 3-role multi-agent workflow
 
 ## 2. Node.js CLI Installer & Governance Verifier
