@@ -4,7 +4,7 @@
 
 ## 1. 前提: 仕様ベースラインの確立
 
-- [ ] 1.1 `bootstrap-ai-ddd-platform` を `openspec-archive-change` でアーカイブし、`openspec list --specs` に `ddd-schema`・`cli-installer`・`reference-examples` が表示され、`openspec validate strengthen-engineering-governance --strict` で「Archive would refuse this delta」通知が消えることを確認する
+- [x] 1.1 `bootstrap-ai-ddd-platform` を `openspec-archive-change` でアーカイブし、`openspec list --specs` に `ddd-schema`・`cli-installer`・`reference-examples` が表示され、`openspec validate strengthen-engineering-governance --strict` で「Archive would refuse this delta」通知が消えることを確認する
 
 ## 2. スキーマ v2・テンプレート・スキル
 
