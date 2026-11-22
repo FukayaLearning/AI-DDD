@@ -11,9 +11,10 @@ export function createOrderingApp(options: {
   dataDir: string;
   inventoryUrl: string;
   paymentUrl: string;
+  httpTimeoutMs?: number;
 }) {
   const kvDriver = new FileKvDriver(options.dataDir);
-  const httpDriver = new FetchHttpJsonDriver();
+  const httpDriver = new FetchHttpJsonDriver(options.httpTimeoutMs ?? 5000);
   const repo = new DriverOrderRepository(kvDriver);
   const inventory = new InventoryGateway(httpDriver, options.inventoryUrl);
   const payment = new PaymentGateway(httpDriver, options.paymentUrl);
@@ -27,7 +28,8 @@ if (isEntrypoint) {
   const dataDir = process.env.ORDER_DATA_DIR ?? path.join(process.cwd(), ".order-data");
   const inventoryUrl = process.env.INVENTORY_URL ?? "http://127.0.0.1:4001/reserve";
   const paymentUrl = process.env.PAYMENT_URL ?? "http://127.0.0.1:4002/charge";
-  const { useCases } = createOrderingApp({ dataDir, inventoryUrl, paymentUrl });
+  const httpTimeoutMs = Number(process.env.HTTP_TIMEOUT_MS ?? "5000");
+  const { useCases } = createOrderingApp({ dataDir, inventoryUrl, paymentUrl, httpTimeoutMs });
   const { baseUrl } = await startOrderWebServer(useCases, port);
   console.log(`LISTENING ${baseUrl}`);
 }
