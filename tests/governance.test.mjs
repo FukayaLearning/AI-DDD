@@ -5,6 +5,7 @@ import path from "node:path";
 import { verifyProject } from "../src/verifier.js";
 import { stampTranslationFile } from "../src/i18n.js";
 import { analyzeTraceability, writeTraceabilityMatrix } from "../src/tracer.js";
+import { verifyIntegrationChecklists, verifyTestCaseIds } from "../src/test-spec.js";
 
 function makeFixture(opts = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-ddd-gov-"));
@@ -262,3 +263,79 @@ The system SHALL place.
 }
 
 console.log("PASS: governance traceability analysis & matrix tests");
+
+// 7. Test specification checklist & 4-language test case ID enforcement
+{
+  const dir = makeFixture();
+  try {
+    // Incomplete checklist (missing N/A or IT IDs for External dependency failure & missing Locale row)
+    writeFile(
+      dir,
+      "docs/testing/integration/order.md",
+      `# Integration Test Spec
+| Category | Case IDs | N/A Reason |
+| :--- | :--- | :--- |
+| Input boundary & invalid values | \`IT-ORD-002\` | |
+| Invalid state transition | \`IT-ORD-003\` | |
+| External dependency failure | | |
+| Persistence / storage failure | \`IT-ORD-004\` | |
+| Duplicate / concurrent conflict | | Single-writer local KV |
+| Target not found | \`IT-ORD-005\` | |
+`
+    );
+    const clBad = verifyIntegrationChecklists(dir);
+    assert.ok(clBad.some((e) => e.includes("External dependency failure")));
+    assert.ok(clBad.some((e) => e.includes("Locale-specific rendering")));
+
+    // Complete checklist passes
+    writeFile(
+      dir,
+      "docs/testing/integration/order.md",
+      `# Integration Test Spec
+| Category | Case IDs | N/A Reason |
+| :--- | :--- | :--- |
+| Input boundary & invalid values | \`IT-ORD-002\` | |
+| Invalid state transition | \`IT-ORD-003\` | |
+| External dependency failure | \`IT-ORD-006\` | |
+| Persistence / storage failure | \`IT-ORD-004\` | |
+| Duplicate / concurrent conflict | | Single-writer local KV |
+| Target not found | \`IT-ORD-005\` | |
+| Locale-specific rendering | \`IT-ORD-007\` | |
+`
+    );
+    assert.deepEqual(verifyIntegrationChecklists(dir), []);
+
+    // 4-language test ID detection (positive and negative)
+    writeFile(
+      dir,
+      "tests/unit/domain.test.mjs",
+      'test("UT-ORD-001 valid", () => {});\ntest("coverage only without id", () => {});\n'
+    );
+    writeFile(
+      dir,
+      "tests/unit/test_order.py",
+      'def test_ut_ord_002_ok():\n    pass\ndef test_missing_id():\n    pass\n'
+    );
+    writeFile(
+      dir,
+      "internal/domain/order/order_test.go",
+      'package order\nfunc TestUT_ORD_003(t *testing.T) {}\nfunc TestNoId(t *testing.T) {}\n'
+    );
+    writeFile(
+      dir,
+      "tests/order_test.rs",
+      '#[test]\n/// UT-ORD-004\nfn valid_case() {}\n#[test]\nfn bare_case() {}\n'
+    );
+
+    const idErrs = verifyTestCaseIds(dir);
+    assert.equal(idErrs.length, 4, JSON.stringify(idErrs));
+    assert.ok(idErrs.some((e) => e.includes("coverage only without id")));
+    assert.ok(idErrs.some((e) => e.includes("test_missing_id")));
+    assert.ok(idErrs.some((e) => e.includes("TestNoId")));
+    assert.ok(idErrs.some((e) => e.includes("bare_case")));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("PASS: governance test-spec checklist & 4-language test ID tests");

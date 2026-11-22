@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_MAX_FILES_PER_DIR, loadProjectConfig } from "./config.js";
 import { verifyTranslations, verifyUiCatalogs } from "./i18n.js";
+import { verifyIntegrationChecklists, verifyTestCaseIds } from "./test-spec.js";
 import { analyzeTraceability } from "./tracer.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -488,6 +489,10 @@ export function verifyProject(targetDir) {
   // 5. Traceability check
   const traceReport = analyzeTraceability(absTarget);
   v2Sink.push(...traceReport.errors);
+
+  // 6. Test specifications & test case IDs
+  v2Sink.push(...verifyIntegrationChecklists(absTarget));
+  v2Sink.push(...verifyTestCaseIds(absTarget));
 
   return {
     ok: errors.length === 0,
