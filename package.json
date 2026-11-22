@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node tests/run-all.mjs",
-    "verify:examples": "node bin/ai-ddd.js verify --target examples/typescript && node bin/ai-ddd.js verify --target examples/python && node bin/ai-ddd.js verify --target examples/go && node bin/ai-ddd.js verify --target examples/rust"
+    "verify:examples": "node scripts/check-drift.mjs && node bin/ai-ddd.js verify --target examples/typescript && node bin/ai-ddd.js verify --target examples/python && node bin/ai-ddd.js verify --target examples/go && node bin/ai-ddd.js verify --target examples/rust"
   },
   "engines": {
     "node": ">=22.0.0"
