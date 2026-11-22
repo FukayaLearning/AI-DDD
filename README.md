@@ -5,8 +5,10 @@ A reusable **OpenSpec × Domain-Driven Design (DDD)** workflow platform combinin
 ## Key Architecture & Principles
 
 - **1 Repository = 1 Bounded Context**: Cross-repository OpenSpec federation is documented as `T.B.D.` in `docs/domain/context-map.md`; specs live under `openspec/specs/<bounded-context>/<capability>/spec.md`.
-- **4-Stage `ddd-driven` Schema**: Preserves `proposal -> specs -> design -> tasks` with embedded Strategic DDD (`docs/domain/ubiquitous-language.md`, `docs/domain/context-map.md`) and Tactical DDD design contracts.
-- **Layer-First 4-Layer Architecture**: `domain` (zero dependencies), `application` (UseCases mapped 1-to-1 to OpenSpec `#### Scenario:`), `infrastructure`, `presentation` (Web UI), and `main` (composition root).
+- **5-Stage `ddd-driven` Schema (v2)**: `proposal -> specs -> design -> test-plan -> tasks` with embedded Strategic DDD (`docs/domain/ubiquitous-language.md`, `docs/domain/context-map.md`), Tactical DDD design contracts, and design-time test planning.
+- **Module-Subdivided 4-Layer Architecture**: `domain/{shared,<aggregate>}` (zero dependencies, aggregate isolation), `application/{shared,<aggregate>/{commands,queries}}` (UseCases mapped 1-to-1 to OpenSpec `#### Scenario:` with `@implements REQ-...`), `infrastructure/{drivers/<tech>,persistence/<aggregate>,acl/<ext>}`, `presentation/<channel>/{shared,<resource>,i18n}` (localized Web UI), and `main` (composition root).
+- **Multi-Locale Support (`--locale`)**: English (`en`) is always the master language; when `locale.user` != `en`, translations are maintained under `i18n/<locale>/` (changes) and `<basename>.<locale>.md` (persistent docs) with SHA-256 staleness verification, and the Web UI renders localized catalogs.
+- **Traceability & Test Specifications**: `REQ-` / `SCN-` / `UT-` / `IT-` IDs link specs, `docs/testing/{unit,integration}/` test specifications (including a 7-category abnormal-path checklist), automated tests, and `@implements` UseCases via `ai-ddd trace`.
 - **`Result<T, E>` Error Handling**: All expected domain and infrastructure failures are returned as typed values across all 4 languages.
 - **3-Part Infrastructure Separation**:
   1. Pure Mappers / ACL converters (mock-free 100% C1 unit tests)
@@ -25,9 +27,9 @@ A reusable **OpenSpec × Domain-Driven Design (DDD)** workflow platform combinin
 
 ## Repository Layout
 
-- `schemas/ddd-driven/`: Custom OpenSpec schema and artifact templates (`proposal.md`, `spec.md`, `design.md`, `tasks.md`)
+- `schemas/ddd-driven/`: Custom OpenSpec schema (v2) and artifact templates (`proposal.md`, `spec.md`, `design.md`, `test-plan.md`, `tasks.md`)
 - `skills/ddd-workflow/SKILL.md`: AI agent workflow skill deployed to Antigravity, Claude Code, Hermes Agent, and GitHub Copilot
-- `bin/ai-ddd.js`, `src/`: Zero-dependency Node.js CLI (`init`, `verify`, `install-schema`) and clean 4-language × 3-distribution (`docker`, `binary`, `library`) skeleton generators
+- `bin/ai-ddd.js`, `src/`: Zero-dependency Node.js CLI (`init`, `verify`, `trace`, `i18n stamp`, `install-schema`) and clean 4-language × 3-distribution (`docker`, `binary`, `library`) skeleton generators
 - `examples/{typescript,python,go,rust}/`: Full Ordering Bounded Context reference implementations with archived OpenSpec specs, domain docs, 4-layer source, unit/browser tests, and integration tests
 - `openspec/`: Standard `spec-driven` OpenSpec workspace managing the `AI-DDD` platform itself
 
@@ -43,13 +45,18 @@ node bin/ai-ddd.js init \
   --dist docker \
   --yes
 
-# Verify layer dependencies, zero inline coverage ignores, and branchless drivers/
+# Verify layer dependencies, module structure, translations, test specs, traceability, and drivers/
 node bin/ai-ddd.js verify --target /path/to/my-context
+
+# Generate traceability matrix (docs/traceability/matrix.md) and check for gaps
+node bin/ai-ddd.js trace --target /path/to/my-context --check
 ```
 
 Supported flags for `init`:
 - `--lang`: `typescript` | `python` | `go` | `rust`
 - `--dist`: `docker` | `binary` | `library`
+- `--locale`: User-facing locale (BCP 47 tag, default: `en`)
+- `--context-code`: Short uppercase prefix for IDs (default: first 3 letters of `--context`)
 - `--tools`: Comma-separated list (default: `antigravity,claude,hermes,github-copilot`)
 - `--global-schema`: Also deploy `ddd-driven` to `${XDG_DATA_HOME:-~/.local/share}/openspec/schemas/ddd-driven`
 
