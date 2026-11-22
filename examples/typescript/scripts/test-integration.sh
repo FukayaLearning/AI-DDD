@@ -154,7 +154,21 @@ try {
     fs.rmSync(notADir, { force: true });
   }
 
-  console.log("PASS: TypeScript Ordering integration tests (IT-ORD-001..009) verified drivers/ and main.ts");
+  // IT-ORD-010: Localized Web UI rendering (ja default & APP_LOCALE=en)
+  const jaPage = await (await fetch(baseUrl + "/")).text();
+  assert.match(jaPage, /<html lang="ja">/);
+  assert.match(jaPage, /注文作成/);
+
+  const enSrv = await startServer({ ORDER_DATA_DIR: dataDir, APP_LOCALE: "en" });
+  try {
+    const enPage = await (await fetch(enSrv.baseUrl + "/")).text();
+    assert.match(enPage, /<html lang="en">/);
+    assert.match(enPage, /Place Order/);
+  } finally {
+    enSrv.child.kill("SIGTERM");
+  }
+
+  console.log("PASS: TypeScript Ordering integration tests (IT-ORD-001..010) verified drivers/ and main.ts");
 } finally {
   child.kill("SIGTERM");
   invSrv.close();

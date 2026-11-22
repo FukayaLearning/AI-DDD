@@ -6,6 +6,8 @@ import { FetchHttpJsonDriver } from "./infrastructure/drivers/http/http_driver.t
 import { FileKvDriver } from "./infrastructure/drivers/kv/kv_driver.ts";
 import { DriverOrderRepository } from "./infrastructure/persistence/order/driver_order_repository.ts";
 import { startOrderWebServer } from "./presentation/web/order/order_web_server.ts";
+import { enMessages } from "./presentation/web/i18n/en.ts";
+import { jaMessages } from "./presentation/web/i18n/ja.ts";
 
 export function createOrderingApp(options: {
   dataDir: string;
@@ -29,7 +31,8 @@ if (isEntrypoint) {
   const inventoryUrl = process.env.INVENTORY_URL ?? "http://127.0.0.1:4001/reserve";
   const paymentUrl = process.env.PAYMENT_URL ?? "http://127.0.0.1:4002/charge";
   const httpTimeoutMs = Number(process.env.HTTP_TIMEOUT_MS ?? "5000");
+  const activeMessages = (process.env.APP_LOCALE ?? "ja") === "en" ? enMessages : jaMessages;
   const { useCases } = createOrderingApp({ dataDir, inventoryUrl, paymentUrl, httpTimeoutMs });
-  const { baseUrl } = await startOrderWebServer(useCases, port);
+  const { baseUrl } = await startOrderWebServer(useCases, port, activeMessages);
   console.log(`LISTENING ${baseUrl}`);
 }

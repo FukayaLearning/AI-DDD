@@ -2,6 +2,7 @@ import http from "node:http";
 import type { OrderSummaryDto, OrderUseCases } from "../../../application/order/commands/order_service.ts";
 import type { DomainError } from "../../../domain/shared/errors.ts";
 import type { Currency } from "../../../domain/shared/value_objects.ts";
+import { enMessages, type OrderMessages } from "../i18n/en.ts";
 
 function escapeHtml(text: string): string {
   return text
@@ -11,21 +12,22 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function layout(title: string, content: string): string {
+function layout(locale: string, title: string, content: string): string {
   return `<!doctype html>
-<html lang="en">
+<html lang="${escapeHtml(locale)}">
 <head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head>
 <body><main>${content}</main></body>
 </html>`;
 }
 
-export function renderCreateOrderPage(error: DomainError | null): string {
+export function renderCreateOrderPage(error: DomainError | null, messages: OrderMessages = enMessages): string {
   const banner = error
     ? `<div data-testid="error-banner">${escapeHtml(error.code)}: ${escapeHtml(error.message)}</div>`
     : "";
   return layout(
-    "Place Order",
-    `<h1>Place Order</h1>
+    messages.locale,
+    messages.placeOrderTitle,
+    `<h1>${escapeHtml(messages.placeOrderTitle)}</h1>
 ${banner}
 <form method="POST" action="/orders">
   <input name="orderId" placeholder="Order ID" />
@@ -34,12 +36,16 @@ ${banner}
   <input name="quantity" type="number" value="1" />
   <input name="unitAmount" type="number" value="1000" />
   <select name="currency"><option value="JPY">JPY</option><option value="USD">USD</option></select>
-  <button type="submit" data-testid="place-order-btn">Place Order</button>
+  <button type="submit" data-testid="place-order-btn">${escapeHtml(messages.placeOrderButton)}</button>
 </form>`
   );
 }
 
-export function renderOrderDetailPage(order: OrderSummaryDto, error: DomainError | null): string {
+export function renderOrderDetailPage(
+  order: OrderSummaryDto,
+  error: DomainError | null,
+  messages: OrderMessages = enMessages
+): string {
   const banner = error
     ? `<div data-testid="error-banner">${escapeHtml(error.code)}: ${escapeHtml(error.message)}</div>`
     : "";
@@ -53,18 +59,19 @@ export function renderOrderDetailPage(order: OrderSummaryDto, error: DomainError
   const cancelDisabled = order.status === "Cancelled" ? " disabled" : "";
 
   return layout(
-    `Order ${order.orderId}`,
-    `<h1>Order ${escapeHtml(order.orderId)}</h1>
+    messages.locale,
+    `${messages.orderPrefix} ${order.orderId}`,
+    `<h1>${escapeHtml(messages.orderPrefix)} ${escapeHtml(order.orderId)}</h1>
 ${banner}
-<p>Customer: <span data-testid="customer-id">${escapeHtml(order.customerId)}</span></p>
-<p>Status: <span data-testid="order-status">${order.status}</span></p>
-<p>Total: <span data-testid="order-total">${order.total.amount} ${order.total.currency}</span></p>
+<p>${escapeHtml(messages.customerLabel)}: <span data-testid="customer-id">${escapeHtml(order.customerId)}</span></p>
+<p>${escapeHtml(messages.statusLabel)}: <span data-testid="order-status">${order.status}</span></p>
+<p>${escapeHtml(messages.totalLabel)}: <span data-testid="order-total">${order.total.amount} ${order.total.currency}</span></p>
 <table><tbody data-testid="order-lines">${linesHtml}</tbody></table>
 <form method="POST" action="/orders/${escapeHtml(order.orderId)}/confirm">
-  <button type="submit" data-testid="confirm-btn"${confirmDisabled}>Confirm Order</button>
+  <button type="submit" data-testid="confirm-btn"${confirmDisabled}>${escapeHtml(messages.confirmButton)}</button>
 </form>
 <form method="POST" action="/orders/${escapeHtml(order.orderId)}/cancel">
-  <button type="submit" data-testid="cancel-btn"${cancelDisabled}>Cancel Order</button>
+  <button type="submit" data-testid="cancel-btn"${cancelDisabled}>${escapeHtml(messages.cancelButton)}</button>
 </form>`
   );
 }
@@ -83,14 +90,14 @@ function sendHtml(res: http.ServerResponse, status: number, html: string): void 
 }
 
 // @implements REQ-ORD-004
-export function createOrderWebHandler(useCases: OrderUseCases) {
+export function createOrderWebHandler(useCases: OrderUseCases, messages: OrderMessages = enMessages) {
   return async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const method = req.method as string;
     const urlPath = req.url as string;
 
     if (method === "GET") {
       if (urlPath === "/") {
-        sendHtml(res, 200, renderCreateOrderPage(null));
+        sendHtml(res, 200, renderCreateOrderPage(null, messages));
         return;
       }
       const detailMatch = urlPath.match(/^\/orders\/([^/]+)$/);
@@ -101,16 +108,17 @@ export function createOrderWebHandler(useCases: OrderUseCases) {
             res,
             404,
             layout(
-              "Order Not Found",
+              messages.locale,
+              messages.orderNotFoundTitle,
               `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(result.error.message)}</div>`
             )
           );
           return;
         }
-        sendHtml(res, 200, renderOrderDetailPage(result.value, null));
+        sendHtml(res, 200, renderOrderDetailPage(result.value, null, messages));
         return;
       }
-      sendHtml(res, 404, layout("Not Found", '<p data-testid="not-found">Page Not Found</p>'));
+      sendHtml(res, 404, layout(messages.locale, messages.notFoundTitle, `<p data-testid="not-found">${escapeHtml(messages.notFoundBody)}</p>`));
       return;
     }
 
@@ -130,10 +138,10 @@ export function createOrderWebHandler(useCases: OrderUseCases) {
           ],
         });
         if (!result.ok) {
-          sendHtml(res, 422, renderCreateOrderPage(result.error));
+          sendHtml(res, 422, renderCreateOrderPage(result.error, messages));
           return;
         }
-        sendHtml(res, 200, renderOrderDetailPage(result.value, null));
+        sendHtml(res, 200, renderOrderDetailPage(result.value, null, messages));
         return;
       }
 
@@ -148,16 +156,17 @@ export function createOrderWebHandler(useCases: OrderUseCases) {
               res,
               404,
               layout(
-                "Order Not Found",
+                messages.locale,
+                messages.orderNotFoundTitle,
                 `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(result.error.message)}</div>`
               )
             );
             return;
           }
-          sendHtml(res, 422, renderOrderDetailPage(current.value, result.error));
+          sendHtml(res, 422, renderOrderDetailPage(current.value, result.error, messages));
           return;
         }
-        sendHtml(res, 200, renderOrderDetailPage(result.value, null));
+        sendHtml(res, 200, renderOrderDetailPage(result.value, null, messages));
         return;
       }
 
@@ -172,29 +181,31 @@ export function createOrderWebHandler(useCases: OrderUseCases) {
               res,
               404,
               layout(
-                "Order Not Found",
+                messages.locale,
+                messages.orderNotFoundTitle,
                 `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(result.error.message)}</div>`
               )
             );
             return;
           }
-          sendHtml(res, 422, renderOrderDetailPage(current.value, result.error));
+          sendHtml(res, 422, renderOrderDetailPage(current.value, result.error, messages));
           return;
         }
-        sendHtml(res, 200, renderOrderDetailPage(result.value, null));
+        sendHtml(res, 200, renderOrderDetailPage(result.value, null, messages));
         return;
       }
     }
 
-    sendHtml(res, 404, layout("Not Found", '<p data-testid="not-found">Page Not Found</p>'));
+    sendHtml(res, 404, layout(messages.locale, messages.notFoundTitle, `<p data-testid="not-found">${escapeHtml(messages.notFoundBody)}</p>`));
   };
 }
 
 export async function startOrderWebServer(
   useCases: OrderUseCases,
-  port = 0
+  port = 0,
+  messages: OrderMessages = enMessages
 ): Promise<{ server: http.Server; baseUrl: string; close: () => Promise<void> }> {
-  const server = http.createServer(createOrderWebHandler(useCases));
+  const server = http.createServer(createOrderWebHandler(useCases, messages));
   await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
   const addr = server.address() as import("node:net").AddressInfo;
   return {

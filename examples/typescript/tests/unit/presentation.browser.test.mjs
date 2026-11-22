@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { domainError } from "../../src/domain/shared/errors.ts";
 import { err, ok } from "../../src/domain/shared/result.ts";
 import { startOrderWebServer } from "../../src/presentation/web/order/order_web_server.ts";
+import { enMessages } from "../../src/presentation/web/i18n/en.ts";
+import { jaMessages } from "../../src/presentation/web/i18n/ja.ts";
 import { launchHeadlessBrowser } from "../../scripts/browser-helper.mjs";
 
 const cases = [];
@@ -111,6 +113,29 @@ test("UT-ORD-027 UT-ORD-028 UT-ORD-029 UT-ORD-030 presentation browser lifecycle
   } finally {
     await browser.close();
     await close();
+  }
+});
+
+test("UT-ORD-031 presentation renders ja and en catalogs with matching html lang", async () => {
+  const mockUseCases = {
+    async placeOrder() { return err(domainError("EMPTY_ORDER_LINES", "x")); },
+    async confirmOrder() { return err(domainError("ORDER_NOT_FOUND", "x")); },
+    async cancelOrder() { return err(domainError("ORDER_NOT_FOUND", "x")); },
+    async getOrder() { return err(domainError("ORDER_NOT_FOUND", "x")); },
+  };
+  for (const msg of [jaMessages, enMessages]) {
+    const srv = await startOrderWebServer(mockUseCases, 0, msg);
+    const b = await launchHeadlessBrowser();
+    try {
+      await b.goto(`${srv.baseUrl}/`);
+      assert.equal(await b.textContent("h1"), msg.placeOrderTitle);
+      assert.equal(await b.textContent('[data-testid="place-order-btn"]'), msg.placeOrderButton);
+      const res = await fetch(`${srv.baseUrl}/`);
+      assert.match(await res.text(), new RegExp(`<html lang="${msg.locale}">`));
+    } finally {
+      await b.close();
+      await srv.close();
+    }
   }
 });
 

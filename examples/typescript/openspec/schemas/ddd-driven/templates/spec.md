@@ -5,10 +5,10 @@
 
 ## ADDED Requirements
 
-### Requirement: <!-- requirement name -->
+### Requirement: REQ-<CTX>-<NNN> <!-- requirement name -->
 <!-- The system SHALL/MUST ... (keep under 500 characters; one behavior per requirement) -->
 
-#### Scenario: <!-- scenario name (1-to-1 with Application UseCase / Web UI test) -->
+#### Scenario: SCN-<CTX>-<NNN>-<NN> <!-- scenario name (1-to-1 with Application UseCase / Web UI test) -->
 - **GIVEN** <!-- preconditions -->
 - **WHEN** <!-- trigger -->
 - **THEN** <!-- expected observable outcome -->

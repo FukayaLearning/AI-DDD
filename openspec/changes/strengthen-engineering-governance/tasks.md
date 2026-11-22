@@ -37,7 +37,7 @@
 - [x] 7.2 `openspec/specs/ordering/order-management/spec.md` に `REQ-ORD-`/`SCN-ORD-` を付与し、`docs/testing/unit/**` と `docs/testing/integration/order-management.md`（正常系＋異常系チェックリスト全 7 カテゴリ）を作成する。仕様書の各ケースに技法・期待結果・根拠が記載されていることを確認する
 - [x] 7.3 単体テストを `node:test` の 1 ケース 1 テストへ分割して UT ID をテスト名に付与し、ユースケース実装に `@implements` を付与する。C1 100% と `ai-ddd trace --check`（UT 部分）が成功することを確認する
 - [x] 7.4 結合テストハーネスに外部スタブのモード切替・永続化障害・タイムアウト短縮（D9）を追加し、IT ケース（入力不正・不正遷移・在庫不足・決済拒否・タイムアウト・利用不可・永続化障害・未存在・ロケール表示）を実装する。`scripts/test-integration.sh` が全 IT を合格し `ai-ddd trace --check` が完全に成功することを確認する
-- [ ] 7.5 Web UI をメッセージカタログ化（en/ja、`APP_LOCALE`）し、ブラウザテストで両ロケールの文言と `<html lang>` を検証する。`ai-ddd.config.json` を `ja` に設定し、メイン仕様・`docs/domain/`・試験仕様書の `.ja.md` 翻訳を作成・stamp する。`ai-ddd verify` と Presentation C1 100% の成功を確認する
+- [x] 7.5 Web UI をメッセージカタログ化（en/ja、`APP_LOCALE`）し、ブラウザテストで両ロケールの文言と `<html lang>` を検証する。`ai-ddd.config.json` を `ja` に設定し、メイン仕様・`docs/domain/`・試験仕様書の `.ja.md` 翻訳を作成・stamp する。`ai-ddd verify` と Presentation C1 100% の成功を確認する
 
 ## 8. Python / Go / Rust サンプルへの横展開
 
