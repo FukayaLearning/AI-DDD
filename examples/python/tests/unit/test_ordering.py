@@ -5,11 +5,11 @@ import unittest
 import urllib.error
 import urllib.request
 
-from src.application.order_service import OrderApplicationService, PlaceOrderCommand, PlaceOrderLineInput
-from src.domain.errors import DomainError
-from src.domain.order import Order, OrderLine
-from src.domain.result import Err, Ok
-from src.domain.value_objects import (
+from src.application.order.commands.order_service import OrderApplicationService, PlaceOrderCommand, PlaceOrderLineInput
+from src.domain.shared.errors import DomainError
+from src.domain.order.order import Order, OrderLine
+from src.domain.shared.result import Err, Ok
+from src.domain.shared.value_objects import (
     add_money,
     create_customer_id,
     create_money,
@@ -18,11 +18,12 @@ from src.domain.value_objects import (
     create_quantity,
     multiply_money,
 )
-from src.infrastructure.acl.external_gateways import InventoryGateway, PaymentGateway
-from src.infrastructure.drivers.http_driver import RawHttpResponse
-from src.infrastructure.repository.driver_order_repository import DriverOrderRepository
-from src.infrastructure.repository.order_mapper import from_order_record, to_order_record
-from src.presentation.order_web_server import run_order_web_server
+from src.infrastructure.acl.inventory.inventory_gateway import InventoryGateway
+from src.infrastructure.acl.payment.payment_gateway import PaymentGateway
+from src.infrastructure.drivers.http.http_driver import RawHttpResponse
+from src.infrastructure.persistence.order.driver_order_repository import DriverOrderRepository
+from src.infrastructure.persistence.order.order_mapper import from_order_record, to_order_record
+from src.presentation.web.order.order_web_server import run_order_web_server
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 
@@ -47,6 +48,7 @@ class InMemoryRepo:
 
 class TestPythonOrderingDDD(unittest.TestCase):
     def test_domain_all_branches(self) -> None:
+        """UT-ORD-001 UT-ORD-002 UT-ORD-003 UT-ORD-004 UT-ORD-005 UT-ORD-006 UT-ORD-007 UT-ORD-008 UT-ORD-009 UT-ORD-010 UT-ORD-011 UT-ORD-012 UT-ORD-013"""
         self.assertIsInstance(create_order_id(" "), Err)
         oid = create_order_id(" ORD-1 ").value
         self.assertIsInstance(create_customer_id(" "), Err)
@@ -94,6 +96,7 @@ class TestPythonOrderingDDD(unittest.TestCase):
         self.assertEqual(cancelled.cancel().error.code, "INVALID_ORDER_STATE")
 
     def test_infrastructure_all_branches(self) -> None:
+        """UT-ORD-014 UT-ORD-015 UT-ORD-016 UT-ORD-017 UT-ORD-018 UT-ORD-019 UT-ORD-020"""
         oid = create_order_id("ORD-100").value
         cid = create_customer_id("CUST-1").value
         pid = create_product_id("P1").value
@@ -183,6 +186,7 @@ class TestPythonOrderingDDD(unittest.TestCase):
         self.assertEqual(PaymentGateway(MockHttp(200, True), "http://pay").charge(oid, order.total_amount()).error.code, "EXTERNAL_TIMEOUT")
 
     def test_application_scenarios(self) -> None:
+        """UT-ORD-021 UT-ORD-022 UT-ORD-023 UT-ORD-024 UT-ORD-025 UT-ORD-026"""
         class OkInv:
             def reserve_stock(self, oid, lines):
                 return Ok(None)
@@ -252,7 +256,8 @@ class TestPythonOrderingDDD(unittest.TestCase):
         self.assertEqual(svc.cancel_order("ORD-1").error.code, "INVALID_ORDER_STATE")
 
     def test_presentation_browser_all_branches(self) -> None:
-        from src.application.order_service import OrderLineDto, OrderSummaryDto
+        """UT-ORD-027 UT-ORD-028 UT-ORD-029 UT-ORD-030 UT-ORD-031"""
+        from src.application.order.commands.order_service import OrderLineDto, OrderSummaryDto
 
         dto_draft = OrderSummaryDto(
             order_id="ORD-WEB-1",
@@ -439,3 +444,17 @@ class TestPythonOrderingDDD(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as cm4:
                 urllib.request.urlopen(urllib.request.Request(f"{base_url}/", method="PUT"))
             self.assertEqual(cm4.exception.code, 404)
+
+        from src.presentation.web.i18n.ja import MESSAGES as JA_MESSAGES
+        with run_order_web_server(uc, 0, JA_MESSAGES) as ja_url:
+            subprocess.run(
+                [
+                    "node",
+                    str(ROOT / "scripts" / "browser_driver.mjs"),
+                    json.dumps([
+                        {"url": f"{ja_url}/", "selector": "h1", "expected": "注文作成"},
+                        {"url": f"{ja_url}/", "selector": "[data-testid='place-order-btn']", "expected": "注文を確定する"},
+                    ]),
+                ],
+                check=True,
+            )

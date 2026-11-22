@@ -1,8 +1,8 @@
 from typing import Any
-from src.domain.errors import DomainError
-from src.domain.order import Order, OrderCancelledEvent, OrderConfirmedEvent, OrderLine
-from src.domain.result import Err, Result
-from src.domain.value_objects import (
+from src.domain.shared.errors import DomainError
+from src.domain.order.order import Order, OrderCancelledEvent, OrderConfirmedEvent, OrderLine
+from src.domain.shared.result import Err, Result
+from src.domain.shared.value_objects import (
     create_customer_id,
     create_money,
     create_order_id,

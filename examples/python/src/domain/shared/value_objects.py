@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
-from src.domain.errors import DomainError
-from src.domain.result import Err, Ok, Result
+from src.domain.shared.errors import DomainError
+from src.domain.shared.result import Err, Ok, Result
 
 Currency = Literal["JPY", "USD"]
 

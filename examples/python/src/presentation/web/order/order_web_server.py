@@ -5,23 +5,25 @@ import re
 from threading import Thread
 from typing import Iterator
 from urllib.parse import parse_qs, unquote
-from src.application.order_service import OrderSummaryDto, OrderUseCases, PlaceOrderCommand, PlaceOrderLineInput
-from src.domain.errors import DomainError
-from src.domain.result import Err
-from src.domain.value_objects import Currency
+from src.application.order.commands.order_service import OrderSummaryDto, OrderUseCases, PlaceOrderCommand, PlaceOrderLineInput
+from src.domain.shared.errors import DomainError
+from src.domain.shared.result import Err
+from src.domain.shared.value_objects import Currency
+from src.presentation.web.i18n.en import MESSAGES as EN_MESSAGES
 
 
-def _layout(title: str, content: str) -> str:
-    return f"<!doctype html><html lang='en'><head><meta charset='utf-8'><title>{escape(title)}</title></head><body><main>{content}</main></body></html>"
+def _layout(locale: str, title: str, content: str) -> str:
+    return f"<!doctype html><html lang='{escape(locale)}'><head><meta charset='utf-8'><title>{escape(title)}</title></head><body><main>{content}</main></body></html>"
 
 
-def render_create_order_page(error: DomainError | None) -> str:
+def render_create_order_page(error: DomainError | None, messages: dict[str, str] = EN_MESSAGES) -> str:
     banner = ""
     if error is not None:
         banner = f"<div data-testid='error-banner'>{escape(error.code)}: {escape(error.message)}</div>"
     return _layout(
-        "Place Order",
-        f"""<h1>Place Order</h1>
+        messages["locale"],
+        messages["placeOrderTitle"],
+        f"""<h1>{escape(messages["placeOrderTitle"])}</h1>
 {banner}
 <form method="POST" action="/orders">
   <input name="orderId" placeholder="Order ID" />
@@ -30,12 +32,16 @@ def render_create_order_page(error: DomainError | None) -> str:
   <input name="quantity" type="number" value="1" />
   <input name="unitAmount" type="number" value="1000" />
   <select name="currency"><option value="JPY">JPY</option><option value="USD">USD</option></select>
-  <button type="submit" data-testid="place-order-btn">Place Order</button>
+  <button type="submit" data-testid="place-order-btn">{escape(messages["placeOrderButton"])}</button>
 </form>""",
     )
 
 
-def render_order_detail_page(order: OrderSummaryDto, error: DomainError | None) -> str:
+def render_order_detail_page(
+    order: OrderSummaryDto,
+    error: DomainError | None,
+    messages: dict[str, str] = EN_MESSAGES,
+) -> str:
     banner = ""
     if error is not None:
         banner = f"<div data-testid='error-banner'>{escape(error.code)}: {escape(error.message)}</div>"
@@ -47,28 +53,34 @@ def render_order_detail_page(order: OrderSummaryDto, error: DomainError | None) 
     cancel_disabled = " disabled" if order.status == "Cancelled" else ""
     oid = escape(order.order_id)
     return _layout(
-        f"Order {order.order_id}",
-        f"""<h1>Order {oid}</h1>
+        messages["locale"],
+        f"{messages['orderPrefix']} {order.order_id}",
+        f"""<h1>{escape(messages["orderPrefix"])} {oid}</h1>
 {banner}
-<p>Customer: <span data-testid="customer-id">{escape(order.customer_id)}</span></p>
-<p>Status: <span data-testid="order-status">{order.status}</span></p>
-<p>Total: <span data-testid="order-total">{order.total.amount} {order.total.currency}</span></p>
+<p>{escape(messages["customerLabel"])}: <span data-testid="customer-id">{escape(order.customer_id)}</span></p>
+<p>{escape(messages["statusLabel"])}: <span data-testid="order-status">{order.status}</span></p>
+<p>{escape(messages["totalLabel"])}: <span data-testid="order-total">{order.total.amount} {order.total.currency}</span></p>
 <table><tbody data-testid="order-lines">{rows}</tbody></table>
 <form method="POST" action="/orders/{oid}/confirm">
-  <button type="submit" data-testid="confirm-btn"{confirm_disabled}>Confirm Order</button>
+  <button type="submit" data-testid="confirm-btn"{confirm_disabled}>{escape(messages["confirmButton"])}</button>
 </form>
 <form method="POST" action="/orders/{oid}/cancel">
-  <button type="submit" data-testid="cancel-btn"{cancel_disabled}>Cancel Order</button>
+  <button type="submit" data-testid="cancel-btn"{cancel_disabled}>{escape(messages["cancelButton"])}</button>
 </form>""",
     )
 
 
+# @implements REQ-ORD-004
 def dispatch_request(
-    use_cases: OrderUseCases, method: str, path: str, body_text: str
+    use_cases: OrderUseCases,
+    method: str,
+    path: str,
+    body_text: str,
+    messages: dict[str, str] = EN_MESSAGES,
 ) -> tuple[int, str]:
     if method == "GET":
         if path == "/":
-            return (200, render_create_order_page(None))
+            return (200, render_create_order_page(None, messages))
         m = re.fullmatch(r"/orders/([^/]+)", path)
         if m:
             res = use_cases.get_order(unquote(m.group(1)))
@@ -76,12 +88,13 @@ def dispatch_request(
                 return (
                     404,
                     _layout(
-                        "Order Not Found",
+                        messages["locale"],
+                        messages["orderNotFoundTitle"],
                         f"<div data-testid='error-banner'>{escape(res.error.code)}: {escape(res.error.message)}</div>",
                     ),
                 )
-            return (200, render_order_detail_page(res.value, None))
-        return (404, _layout("Not Found", "<p data-testid='not-found'>Page Not Found</p>"))
+            return (200, render_order_detail_page(res.value, None, messages))
+        return (404, _layout(messages["locale"], messages["notFoundTitle"], f"<p data-testid='not-found'>{escape(messages['notFoundBody'])}</p>"))
 
     if method == "POST":
         if path == "/orders":
@@ -103,8 +116,8 @@ def dispatch_request(
                 )
             )
             if isinstance(res, Err):
-                return (422, render_create_order_page(res.error))
-            return (200, render_order_detail_page(res.value, None))
+                return (422, render_create_order_page(res.error, messages))
+            return (200, render_order_detail_page(res.value, None, messages))
 
         m_confirm = re.fullmatch(r"/orders/([^/]+)/confirm", path)
         if m_confirm:
@@ -116,12 +129,13 @@ def dispatch_request(
                     return (
                         404,
                         _layout(
-                            "Order Not Found",
+                            messages["locale"],
+                            messages["orderNotFoundTitle"],
                             f"<div data-testid='error-banner'>{escape(res.error.code)}: {escape(res.error.message)}</div>",
                         ),
                     )
-                return (422, render_order_detail_page(cur.value, res.error))
-            return (200, render_order_detail_page(res.value, None))
+                return (422, render_order_detail_page(cur.value, res.error, messages))
+            return (200, render_order_detail_page(res.value, None, messages))
 
         m_cancel = re.fullmatch(r"/orders/([^/]+)/cancel", path)
         if m_cancel:
@@ -133,33 +147,34 @@ def dispatch_request(
                     return (
                         404,
                         _layout(
-                            "Order Not Found",
+                            messages["locale"],
+                            messages["orderNotFoundTitle"],
                             f"<div data-testid='error-banner'>{escape(res.error.code)}: {escape(res.error.message)}</div>",
                         ),
                     )
-                return (422, render_order_detail_page(cur.value, res.error))
-            return (200, render_order_detail_page(res.value, None))
+                return (422, render_order_detail_page(cur.value, res.error, messages))
+            return (200, render_order_detail_page(res.value, None, messages))
 
-    return (404, _layout("Not Found", "<p data-testid='not-found'>Page Not Found</p>"))
+    return (404, _layout(messages["locale"], messages["notFoundTitle"], f"<p data-testid='not-found'>{escape(messages['notFoundBody'])}</p>"))
 
 
-def make_handler(use_cases: OrderUseCases):
+def make_handler(use_cases: OrderUseCases, messages: dict[str, str] = EN_MESSAGES):
     class OrderHandler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: object) -> None:
             return
 
         def do_GET(self) -> None:
-            status, html = dispatch_request(use_cases, "GET", self.path, "")
+            status, html = dispatch_request(use_cases, "GET", self.path, "", messages)
             self._send(status, html)
 
         def do_POST(self) -> None:
             length = int(self.headers["Content-Length"])
             body = self.rfile.read(length).decode("utf-8")
-            status, html = dispatch_request(use_cases, "POST", self.path, body)
+            status, html = dispatch_request(use_cases, "POST", self.path, body, messages)
             self._send(status, html)
 
         def do_PUT(self) -> None:
-            status, html = dispatch_request(use_cases, "PUT", self.path, "")
+            status, html = dispatch_request(use_cases, "PUT", self.path, "", messages)
             self._send(status, html)
 
         def _send(self, status: int, html: str) -> None:
@@ -174,8 +189,12 @@ def make_handler(use_cases: OrderUseCases):
 
 
 @contextmanager
-def run_order_web_server(use_cases: OrderUseCases, port: int = 0) -> Iterator[str]:
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(use_cases))
+def run_order_web_server(
+    use_cases: OrderUseCases,
+    port: int = 0,
+    messages: dict[str, str] = EN_MESSAGES,
+) -> Iterator[str]:
+    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(use_cases, messages))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

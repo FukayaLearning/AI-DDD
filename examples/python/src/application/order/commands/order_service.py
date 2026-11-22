@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from typing import Protocol
-from src.domain.errors import DomainError
-from src.domain.order import Order, OrderLine, OrderStatus
-from src.domain.ports import InventoryPort, OrderRepository, PaymentPort
-from src.domain.result import Err, Ok, Result
-from src.domain.value_objects import (
+from src.domain.shared.errors import DomainError
+from src.domain.order.order import Order, OrderLine, OrderStatus
+from src.domain.order.order_repository import OrderRepository
+from src.application.shared.ports import InventoryPort, PaymentPort
+from src.domain.shared.result import Err, Ok, Result
+from src.domain.shared.value_objects import (
     Currency,
     Money,
     create_customer_id,
@@ -47,8 +48,11 @@ class OrderSummaryDto:
 
 
 class OrderUseCases(Protocol):
+    # @implements REQ-ORD-001
     def place_order(self, cmd: PlaceOrderCommand) -> Result[OrderSummaryDto, DomainError]: ...
+    # @implements REQ-ORD-002
     def confirm_order(self, order_id: str) -> Result[OrderSummaryDto, DomainError]: ...
+    # @implements REQ-ORD-003
     def cancel_order(self, order_id: str) -> Result[OrderSummaryDto, DomainError]: ...
     def get_order(self, order_id: str) -> Result[OrderSummaryDto, DomainError]: ...
 
@@ -76,6 +80,7 @@ class OrderApplicationService:
         self._inventory = inventory
         self._payment = payment
 
+    # @implements REQ-ORD-001
     def place_order(self, cmd: PlaceOrderCommand) -> Result[OrderSummaryDto, DomainError]:
         id_res = create_order_id(cmd.order_id)
         if isinstance(id_res, Err):
@@ -108,6 +113,7 @@ class OrderApplicationService:
 
         return Ok(_to_dto(order_res.value))
 
+    # @implements REQ-ORD-002
     def confirm_order(self, raw_order_id: str) -> Result[OrderSummaryDto, DomainError]:
         id_res = create_order_id(raw_order_id)
         if isinstance(id_res, Err):
@@ -136,6 +142,7 @@ class OrderApplicationService:
 
         return Ok(_to_dto(confirmed_res.value))
 
+    # @implements REQ-ORD-003
     def cancel_order(self, raw_order_id: str) -> Result[OrderSummaryDto, DomainError]:
         id_res = create_order_id(raw_order_id)
         if isinstance(id_res, Err):

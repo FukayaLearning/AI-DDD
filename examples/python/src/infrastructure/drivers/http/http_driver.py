@@ -15,6 +15,9 @@ class HttpJsonDriver(Protocol):
 
 
 class UrllibHttpJsonDriver:
+    def __init__(self, timeout_sec: float = 5.0) -> None:
+        self._timeout_sec = timeout_sec
+
     def post_json(self, url: str, body_json: str) -> RawHttpResponse:
         req = urllib.request.Request(
             url,
@@ -23,7 +26,7 @@ class UrllibHttpJsonDriver:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=self._timeout_sec) as resp:
                 return RawHttpResponse(status=resp.status, body_text=resp.read().decode("utf-8"))
         except urllib.error.HTTPError as err:
             return RawHttpResponse(status=err.code, body_text=err.read().decode("utf-8"))

@@ -41,7 +41,7 @@
 
 ## 8. Python / Go / Rust サンプルへの横展開
 
-- [ ] 8.1 Python サンプルに 7.1–7.5 と同等の構造・ID・試験仕様書・異常系結合テスト・ja 対応を適用し、`scripts/run-all.sh`・`ai-ddd verify`・`ai-ddd trace --check` の成功を確認する
+- [x] 8.1 Python サンプルに 7.1–7.5 と同等の構造・ID・試験仕様書・異常系結合テスト・ja 対応を適用し、`scripts/run-all.sh`・`ai-ddd verify`・`ai-ddd trace --check` の成功を確認する
 - [ ] 8.2 Go サンプルに同等の変更を適用（テストは同一パッケージの `*_test.go` を維持）し、`scripts/run-all.sh`・`ai-ddd verify`・`ai-ddd trace --check` の成功を確認する
 - [ ] 8.3 Rust サンプルに同等の変更を適用（`mod.rs` によるモジュール宣言）し、`scripts/run-all.sh`・`ai-ddd verify`・`ai-ddd trace --check` の成功を確認する
 

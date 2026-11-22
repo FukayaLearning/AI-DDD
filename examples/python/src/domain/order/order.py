@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal
-from src.domain.errors import DomainError
-from src.domain.result import Err, Ok, Result
-from src.domain.value_objects import CustomerId, Money, OrderId, ProductId, Quantity, add_money, multiply_money
+from src.domain.shared.errors import DomainError
+from src.domain.shared.result import Err, Ok, Result
+from src.domain.shared.value_objects import CustomerId, Money, OrderId, ProductId, Quantity, add_money, multiply_money
 
 OrderStatus = Literal["Draft", "Confirmed", "Cancelled"]
 

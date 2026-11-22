@@ -1,10 +1,10 @@
 import json
-from src.domain.errors import DomainError
-from src.domain.order import Order
-from src.domain.result import Err, Ok, Result
-from src.domain.value_objects import OrderId
-from src.infrastructure.drivers.kv_driver import KeyValueStorageDriver
-from src.infrastructure.repository.order_mapper import from_order_record, to_order_record
+from src.domain.shared.errors import DomainError
+from src.domain.order.order import Order
+from src.domain.shared.result import Err, Ok, Result
+from src.domain.shared.value_objects import OrderId
+from src.infrastructure.drivers.kv.kv_driver import KeyValueStorageDriver
+from src.infrastructure.persistence.order.order_mapper import from_order_record, to_order_record
 
 
 class DriverOrderRepository:
