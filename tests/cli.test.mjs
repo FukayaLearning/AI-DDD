@@ -49,6 +49,19 @@ function runShell(cmd, args, cwd) {
     assert.ok(fs.existsSync(path.join(dir, "docs", "domain", "context-map.md")));
     assert.ok(fs.existsSync(path.join(dir, ".agents", "skills", "ddd-workflow", "SKILL.md")));
 
+    const schemaText = fs.readFileSync(path.join(dir, "openspec", "schemas", "ddd-driven", "schema.yaml"), "utf8");
+    assert.match(schemaText, /Git Workflow/);
+    assert.match(schemaText, /Pre-Task Branching & Baseline Commit/);
+    assert.match(schemaText, /Per-Task Atomic Commit/);
+
+    const configText = fs.readFileSync(path.join(dir, "openspec", "config.yaml"), "utf8");
+    assert.match(configText, /working branch/);
+    assert.match(configText, /completing each individual task/);
+
+    const skillText = fs.readFileSync(path.join(dir, ".agents", "skills", "ddd-workflow", "SKILL.md"), "utf8");
+    assert.match(skillText, /Git Branching & Per-Task Commit Discipline/);
+    assert.match(skillText, /1-Task = 1-Commit Rule/);
+
     // Static verify passes
     const vOut = runNodeCli(["verify", "--target", dir]);
     assert.match(vOut, /PASS:/);

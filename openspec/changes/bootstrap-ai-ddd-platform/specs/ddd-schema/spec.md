@@ -29,3 +29,11 @@ The `ddd-driven` schema SHALL enforce explicit identification of unit-test exclu
 - **GIVEN** a change created under `ddd-driven`
 - **WHEN** `design.md` and `tasks.md` are generated from schema templates
 - **THEN** `design.md` includes sections for Domain Model, 4-Layer Architecture, Infrastructure 3-part separation, Unit-Test Exclusions, and Integration Test Plan, and `tasks.md` sequences Domain TDD, Infrastructure abnormal-path TDD, Application Scenario TDD, Presentation Mock+Browser TDD, Integration Test, and Zero-Context Review
+
+### Requirement: Git branch and per-task commit workflow during apply
+When the target project is under Git version control, the `ddd-driven` schema and `ddd-workflow` skill SHALL instruct `openspec-apply` to consult the user on working-branch creation and commit post-propose planning artifacts before the first task, and create one commit per completed task; non-Git projects SHALL omit these Git steps.
+
+#### Scenario: Git workflow applies only to Git-managed repositories
+- **GIVEN** a change ready for `openspec-apply` under the `ddd-driven` schema
+- **WHEN** evaluating Git management instructions before and during task execution
+- **THEN** Git-managed repositories prompt for branch creation and commit post-propose artifacts first followed by one commit per completed task, while non-Git repositories skip Git operations

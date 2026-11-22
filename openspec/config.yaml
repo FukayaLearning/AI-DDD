@@ -1,32 +1,17 @@
 schema: spec-driven
 
-# Project context (optional)
-# Add only constraints that should guide OpenSpec artifacts and workflows.
-# Include constraints an agent cannot infer by reading the code.
-# Keep general project documentation and discoverable codebase facts out.
-# Example:
-#   context: |
-#     Designs and tasks must cover Windows, macOS, and Linux
-#     Write all artifacts in Spanish
+context: |
+  Project: AI-DDD (OpenSpec x DDD Platform)
+  Git Workflow (omit/skip if the repository is not under Git control):
+    - Before starting Task 1 in openspec-apply, check git status, ask the user to confirm creating/switching to a working branch (e.g., feat/<change-name>), and commit the pre-task (post-propose) planning artifacts to that branch.
+    - Commit once per completed task (including its tasks.md checkbox update) before proceeding to the next task.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always state what is out of scope
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  tasks:
+    - "Under Git control (skip if not a Git repository): commit the post-propose baseline after confirming the working branch before Task 1, and commit once per completed task"
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - "If the repository is under Git control (skip if not a Git repository): before starting the first task in openspec-apply, ask the user to confirm creating/switching to a working branch and commit the pre-task (post-propose) artifacts to that branch"
+      - "If under Git control: commit after completing each individual task (including its tasks.md checkbox update) before proceeding to the next task"

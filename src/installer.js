@@ -89,6 +89,8 @@ operations:
       - Main Agent owns spec authoring, 4-layer implementation, and test authoring in one continuous context
       - Execution Subagent (lightweight model) runs builds, ai-ddd verify, unit+browser C1 tests, and integration tests
       - Independent Review Subagent (high-capability model, ZERO prior conversation context) audits final files against OpenSpec and C1 governance
+      - "If the repository is under Git control (skip if not a Git repository): before starting the first task in openspec-apply, ask the user to confirm creating/switching to a working branch and commit the pre-task (post-propose) artifacts to that branch"
+      - "If under Git control: commit after completing each individual task (including its tasks.md checkbox update) before proceeding to the next task"
 `;
 }
 

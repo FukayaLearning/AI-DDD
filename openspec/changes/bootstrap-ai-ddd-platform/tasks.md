@@ -4,6 +4,7 @@
 
 - [x] 1.1 Create `schemas/ddd-driven/schema.yaml` and templates (`proposal.md`, `spec.md`, `design.md`, `tasks.md`) and verify with `openspec schema validate`
 - [x] 1.2 Create `skills/ddd-workflow/SKILL.md` documenting strategic/tactical DDD, C1 100% rules, and 3-role multi-agent workflow
+- [x] 1.3 Define Git branching (pre-task hearing & post-propose baseline commit) and per-task atomic commit rules across `ddd-driven` schema, `ddd-workflow` skill, root `openspec/config.yaml`, and reference examples
 
 ## 2. Node.js CLI Installer & Governance Verifier
 

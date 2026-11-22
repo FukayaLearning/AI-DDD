@@ -21,6 +21,7 @@ A reusable **OpenSpec × Domain-Driven Design (DDD)** workflow platform combinin
   - **Main Agent**: Continuous context authoring (`proposal` through 4-layer TDD implementation)
   - **Execution Subagent** (`flash`/`flash_lite`): Mechanical builds, `ai-ddd verify`, C1/browser suites, integration tests
   - **Independent Review Subagent** (`pro`, zero prior context): Unbiased file-only audit of specs, Ubiquitous Language, and C1 governance
+- **Git Branching & Per-Task Commits (`openspec-apply`)**: When under Git control (omitted if not under Git control), `openspec-apply` confirms working-branch creation with the user and commits post-propose planning artifacts before Task 1, then commits after each individual task completes.
 
 ## Repository Layout
 

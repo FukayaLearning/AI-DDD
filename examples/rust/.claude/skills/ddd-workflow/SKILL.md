@@ -45,3 +45,13 @@ Use this skill whenever designing, implementing, testing, or verifying changes i
 3. **Independent Review Subagent (High-Capability Model, e.g., `pro`, ZERO Prior Context)**:
    - Launch fresh with **no conversation history**—pass only the OpenSpec docs, `docs/domain/`, source files, and test/coverage outputs.
    - Audits spec-to-implementation fidelity, Ubiquitous Language accuracy, `drivers/` purity, and genuine C1 100% branch coverage.
+
+## 4. Git Branching & Per-Task Commit Discipline (`openspec-apply`)
+
+If the project is **not** under Git version control (e.g., `git rev-parse --is-inside-work-tree` fails), omit all Git steps below. When under Git control:
+
+1. **Pre-Task Branch Hearing & Post-Propose Commit**:
+   - Before executing the first pending task in `openspec-apply`, ask the user whether to create/switch to a dedicated working branch and confirm the branch name (e.g., `feat/<change-name>`).
+   - Create/checkout that branch and commit the pre-task baseline (the post-propose planning artifacts: `proposal.md`, `specs/`, `design.md`, `tasks.md`) to the branch before starting Task 1.
+2. **1-Task = 1-Commit Rule**:
+   - Implement and verify tasks one at a time. Immediately after each individual task completes and its checkbox in `tasks.md` is updated from `- [ ]` to `- [x]`, commit that task's changes (including `tasks.md`) to the branch before moving to the next task.
