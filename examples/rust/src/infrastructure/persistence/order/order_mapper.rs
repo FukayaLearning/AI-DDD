@@ -1,7 +1,7 @@
-use crate::domain::errors::DomainError;
-use crate::domain::order::{DomainEvent, Order, OrderLine, OrderStatus};
-use crate::domain::result::DomainResult;
-use crate::domain::value_objects::{
+use crate::domain::shared::errors::DomainError;
+use crate::domain::order::order::{DomainEvent, Order, OrderLine, OrderStatus};
+use crate::domain::shared::result::DomainResult;
+use crate::domain::shared::value_objects::{
     create_customer_id, create_money, create_order_id, create_product_id, create_quantity, Currency,
 };
 

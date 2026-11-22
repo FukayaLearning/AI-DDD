@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "context": {
+    "name": "ordering",
+    "code": "ORD"
+  },
+  "locale": {
+    "master": "en",
+    "user": "ja"
+  },
+  "structure": {
+    "maxFilesPerDirectory": 15
+  },
+  "coverage": {
+    "configFile": "c1-coverage.config.json"
+  }
+}

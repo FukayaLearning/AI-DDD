@@ -6,7 +6,15 @@ pub trait HttpJsonDriver {
     fn post_json_raw(&self, url: &str, body_json: &str) -> Result<String, String>;
 }
 
-pub struct TcpHttpJsonDriver;
+pub struct TcpHttpJsonDriver {
+    pub timeout_ms: u64,
+}
+
+impl TcpHttpJsonDriver {
+    pub fn new(timeout_ms: u64) -> Self {
+        Self { timeout_ms }
+    }
+}
 
 impl HttpJsonDriver for TcpHttpJsonDriver {
     fn post_json_raw(&self, url: &str, body_json: &str) -> Result<String, String> {
@@ -14,7 +22,7 @@ impl HttpJsonDriver for TcpHttpJsonDriver {
         let (host_port, req_path_tail) = stripped.split_once('/').unwrap_or((stripped, ""));
         let req_path = format!("/{}", req_path_tail);
         let mut stream = TcpStream::connect(host_port).map_err(|e| e.to_string())?;
-        let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(self.timeout_ms)));
         let req = format!(
             "POST {} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
             req_path,

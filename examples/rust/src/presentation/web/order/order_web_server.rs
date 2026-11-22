@@ -1,10 +1,11 @@
-use crate::application::order_service::{
+use crate::presentation::web::i18n::en::OrderMessages;
+use crate::application::order::commands::order_service::{
     OrderSummaryDto, OrderUseCases, PlaceOrderCommand, PlaceOrderLineInput,
 };
-use crate::domain::errors::DomainError;
-use crate::domain::order::OrderStatus;
-use crate::domain::result::DomainResult;
-use crate::domain::value_objects::Currency;
+use crate::domain::shared::errors::DomainError;
+use crate::domain::order::order::OrderStatus;
+use crate::domain::shared::result::DomainResult;
+use crate::domain::shared::value_objects::Currency;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -16,15 +17,16 @@ fn escape_html(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
-fn layout(title: &str, content: &str) -> String {
+fn layout(locale: &str, title: &str, content: &str) -> String {
     format!(
-        "<!doctype html><html lang='en'><head><meta charset='utf-8'><title>{}</title></head><body><main>{}</main></body></html>",
+        "<!doctype html><html lang='{}'><head><meta charset='utf-8'><title>{}</title></head><body><main>{}</main></body></html>",
+        escape_html(locale),
         escape_html(title),
         content
     )
 }
 
-pub fn render_create_order_page(error: Option<&DomainError>) -> String {
+pub fn render_create_order_page(error: Option<&DomainError>, msg: &OrderMessages) -> String {
     let banner = match error {
         Some(e) => format!(
             "<div data-testid='error-banner'>{}: {}</div>",
@@ -34,9 +36,10 @@ pub fn render_create_order_page(error: Option<&DomainError>) -> String {
         None => String::new(),
     };
     layout(
-        "Place Order",
+        msg.locale,
+        msg.place_order_title,
         &format!(
-            r#"<h1>Place Order</h1>{}
+            r#"<h1>{}</h1>{}
 <form method="POST" action="/orders">
   <input name="orderId" placeholder="Order ID" />
   <input name="customerId" placeholder="Customer ID" />
@@ -44,14 +47,16 @@ pub fn render_create_order_page(error: Option<&DomainError>) -> String {
   <input name="quantity" type="number" value="1" />
   <input name="unitAmount" type="number" value="1000" />
   <select name="currency"><option value="JPY">JPY</option><option value="USD">USD</option></select>
-  <button type="submit" data-testid="place-order-btn">Place Order</button>
+  <button type="submit" data-testid="place-order-btn">{}</button>
 </form>"#,
-            banner
+            escape_html(msg.place_order_title),
+            banner,
+            escape_html(msg.place_order_button)
         ),
     )
 }
 
-pub fn render_order_detail_page(order: &OrderSummaryDto, error: Option<&DomainError>) -> String {
+pub fn render_order_detail_page(order: &OrderSummaryDto, error: Option<&DomainError>, msg: &OrderMessages) -> String {
     let banner = match error {
         Some(e) => format!(
             "<div data-testid='error-banner'>{}: {}</div>",
@@ -77,26 +82,33 @@ pub fn render_order_detail_page(order: &OrderSummaryDto, error: Option<&DomainEr
     let cancel_disabled = if order.status == OrderStatus::Cancelled { " disabled" } else { "" };
     let oid = escape_html(&order.order_id);
     layout(
-        &format!("Order {}", order.order_id),
+        msg.locale,
+        &format!("{} {}", msg.order_prefix, order.order_id),
         &format!(
-            r#"<h1>Order {}</h1>{}
-<p>Customer: <span data-testid="customer-id">{}</span></p>
-<p>Status: <span data-testid="order-status">{}</span></p>
-<p>Total: <span data-testid="order-total">{} {}</span></p>
+            r#"<h1>{} {}</h1>{}
+<p>{}: <span data-testid="customer-id">{}</span></p>
+<p>{}: <span data-testid="order-status">{}</span></p>
+<p>{}: <span data-testid="order-total">{} {}</span></p>
 <table><tbody data-testid="order-lines">{}</tbody></table>
-<form method="POST" action="/orders/{}/confirm"><button type="submit" data-testid="confirm-btn"{}>Confirm Order</button></form>
-<form method="POST" action="/orders/{}/cancel"><button type="submit" data-testid="cancel-btn"{}>Cancel Order</button></form>"#,
+<form method="POST" action="/orders/{}/confirm"><button type="submit" data-testid="confirm-btn"{}>{}</button></form>
+<form method="POST" action="/orders/{}/cancel"><button type="submit" data-testid="cancel-btn"{}>{}</button></form>"#,
+            escape_html(msg.order_prefix),
             oid,
             banner,
+            escape_html(msg.customer_label),
             escape_html(&order.customer_id),
+            escape_html(msg.status_label),
             order.status.as_str(),
+            escape_html(msg.total_label),
             order.total.amount,
             order.total.currency.as_str(),
             rows,
             oid,
             confirm_disabled,
+            escape_html(msg.confirm_button),
             oid,
-            cancel_disabled
+            cancel_disabled,
+            escape_html(msg.cancel_button)
         ),
     )
 }
@@ -111,24 +123,27 @@ fn parse_form(body: &str) -> HashMap<String, String> {
     map
 }
 
+// @implements REQ-ORD-004
 pub fn handle_http_request<U: OrderUseCases>(
     use_cases: &U,
     method: &str,
     path: &str,
     body: &str,
+    msg: &OrderMessages,
 ) -> (u16, String) {
     if method == "GET" {
         if path == "/" {
-            return (200, render_create_order_page(None));
+            return (200, render_create_order_page(None, msg));
         }
         if let Some(oid) = path.strip_prefix("/orders/") {
             if !oid.is_empty() && !oid.contains('/') {
                 return match use_cases.get_order(oid) {
-                    DomainResult::Ok(order) => (200, render_order_detail_page(&order, None)),
+                    DomainResult::Ok(order) => (200, render_order_detail_page(&order, None, msg)),
                     DomainResult::Err(e) => (
                         404,
                         layout(
-                            "Order Not Found",
+                            msg.locale,
+                            msg.order_not_found_title,
                             &format!(
                                 "<div data-testid='error-banner'>{}: {}</div>",
                                 escape_html(&e.code),
@@ -141,7 +156,7 @@ pub fn handle_http_request<U: OrderUseCases>(
         }
         return (
             404,
-            layout("Not Found", "<p data-testid='not-found'>Page Not Found</p>"),
+            layout(msg.locale, msg.not_found_title, "<p data-testid='not-found'>Page Not Found</p>"),
         );
     }
 
@@ -165,20 +180,21 @@ pub fn handle_http_request<U: OrderUseCases>(
                 }],
             };
             return match use_cases.place_order(cmd) {
-                DomainResult::Ok(order) => (200, render_order_detail_page(&order, None)),
-                DomainResult::Err(e) => (422, render_create_order_page(Some(&e))),
+                DomainResult::Ok(order) => (200, render_order_detail_page(&order, None, msg)),
+                DomainResult::Err(e) => (422, render_create_order_page(Some(&e), msg)),
             };
         }
         if let Some(rest) = path.strip_prefix("/orders/") {
             if let Some(oid) = rest.strip_suffix("/confirm") {
                 return match use_cases.confirm_order(oid) {
-                    DomainResult::Ok(order) => (200, render_order_detail_page(&order, None)),
+                    DomainResult::Ok(order) => (200, render_order_detail_page(&order, None, msg)),
                     DomainResult::Err(e) => match use_cases.get_order(oid) {
-                        DomainResult::Ok(cur) => (422, render_order_detail_page(&cur, Some(&e))),
+                        DomainResult::Ok(cur) => (422, render_order_detail_page(&cur, Some(&e), msg)),
                         DomainResult::Err(_) => (
                             404,
                             layout(
-                                "Order Not Found",
+                                msg.locale,
+                                msg.order_not_found_title,
                                 &format!(
                                     "<div data-testid='error-banner'>{}: {}</div>",
                                     escape_html(&e.code),
@@ -191,13 +207,14 @@ pub fn handle_http_request<U: OrderUseCases>(
             }
             if let Some(oid) = rest.strip_suffix("/cancel") {
                 return match use_cases.cancel_order(oid) {
-                    DomainResult::Ok(order) => (200, render_order_detail_page(&order, None)),
+                    DomainResult::Ok(order) => (200, render_order_detail_page(&order, None, msg)),
                     DomainResult::Err(e) => match use_cases.get_order(oid) {
-                        DomainResult::Ok(cur) => (422, render_order_detail_page(&cur, Some(&e))),
+                        DomainResult::Ok(cur) => (422, render_order_detail_page(&cur, Some(&e), msg)),
                         DomainResult::Err(_) => (
                             404,
                             layout(
-                                "Order Not Found",
+                                msg.locale,
+                                msg.order_not_found_title,
                                 &format!(
                                     "<div data-testid='error-banner'>{}: {}</div>",
                                     escape_html(&e.code),
@@ -213,11 +230,11 @@ pub fn handle_http_request<U: OrderUseCases>(
 
     (
         404,
-        layout("Not Found", "<p data-testid='not-found'>Page Not Found</p>"),
+        layout(msg.locale, msg.not_found_title, "<p data-testid='not-found'>Page Not Found</p>"),
     )
 }
 
-pub fn serve_single_connection<U: OrderUseCases>(mut stream: TcpStream, use_cases: &U) {
+pub fn serve_single_connection<U: OrderUseCases>(mut stream: TcpStream, use_cases: &U, msg: &OrderMessages) {
     let mut raw = Vec::new();
     let mut buf = [0u8; 4096];
     let mut header_end = None;
@@ -262,7 +279,7 @@ pub fn serve_single_connection<U: OrderUseCases>(mut stream: TcpStream, use_case
     };
     let body = String::from_utf8_lossy(body_slice);
 
-    let (status_code, html) = handle_http_request(use_cases, method, path, &body);
+    let (status_code, html) = handle_http_request(use_cases, method, path, &body, msg);
     let status_text = match status_code {
         200 => "OK",
         422 => "Unprocessable Entity",

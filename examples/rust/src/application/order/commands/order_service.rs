@@ -1,8 +1,9 @@
-use crate::domain::errors::DomainError;
-use crate::domain::order::{Order, OrderLine, OrderStatus};
-use crate::domain::ports::{InventoryPort, OrderRepository, PaymentPort};
-use crate::domain::result::DomainResult;
-use crate::domain::value_objects::{
+use crate::domain::shared::errors::DomainError;
+use crate::domain::order::order::{Order, OrderLine, OrderStatus};
+use crate::application::shared::ports::{InventoryPort, PaymentPort};
+use crate::domain::order::order_repository::OrderRepository;
+use crate::domain::shared::result::DomainResult;
+use crate::domain::shared::value_objects::{
     create_customer_id, create_money, create_order_id, create_product_id, create_quantity, Currency, Money,
 };
 
@@ -79,6 +80,7 @@ fn to_dto(order: &Order) -> OrderSummaryDto {
 }
 
 impl<R: OrderRepository, I: InventoryPort, P: PaymentPort> OrderUseCases for OrderApplicationService<R, I, P> {
+    // @implements REQ-ORD-001
     fn place_order(&self, cmd: PlaceOrderCommand) -> DomainResult<OrderSummaryDto, DomainError> {
         let oid = match create_order_id(&cmd.order_id) {
             DomainResult::Ok(v) => v,
@@ -118,6 +120,7 @@ impl<R: OrderRepository, I: InventoryPort, P: PaymentPort> OrderUseCases for Ord
         DomainResult::Ok(to_dto(&order))
     }
 
+    // @implements REQ-ORD-002
     fn confirm_order(&self, raw_order_id: &str) -> DomainResult<OrderSummaryDto, DomainError> {
         let oid = match create_order_id(raw_order_id) {
             DomainResult::Ok(v) => v,
@@ -143,6 +146,7 @@ impl<R: OrderRepository, I: InventoryPort, P: PaymentPort> OrderUseCases for Ord
         DomainResult::Ok(to_dto(&confirmed))
     }
 
+    // @implements REQ-ORD-003
     fn cancel_order(&self, raw_order_id: &str) -> DomainResult<OrderSummaryDto, DomainError> {
         let oid = match create_order_id(raw_order_id) {
             DomainResult::Ok(v) => v,

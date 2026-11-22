@@ -1,1 +1,2 @@
-pub mod external_gateways;
+pub mod inventory;
+pub mod payment;

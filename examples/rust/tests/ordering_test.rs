@@ -1,23 +1,27 @@
-use ordering_rs::application::order_service::{
+use ordering_rs::presentation::web::i18n::en::EN_MESSAGES;
+use ordering_rs::presentation::web::i18n::ja::JA_MESSAGES;
+use ordering_rs::application::order::commands::order_service::{
     OrderApplicationService, OrderLineDto, OrderSummaryDto, OrderUseCases, PlaceOrderCommand,
     PlaceOrderLineInput,
 };
-use ordering_rs::domain::errors::DomainError;
-use ordering_rs::domain::order::{Order, OrderLine, OrderStatus};
-use ordering_rs::domain::ports::{InventoryPort, OrderRepository, PaymentPort};
-use ordering_rs::domain::result::DomainResult;
-use ordering_rs::domain::value_objects::{
+use ordering_rs::domain::shared::errors::DomainError;
+use ordering_rs::domain::order::order::{Order, OrderLine, OrderStatus};
+use ordering_rs::application::shared::ports::{InventoryPort, PaymentPort};
+use ordering_rs::domain::order::order_repository::OrderRepository;
+use ordering_rs::domain::shared::result::DomainResult;
+use ordering_rs::domain::shared::value_objects::{
     add_money, create_customer_id, create_money, create_order_id, create_product_id,
     create_quantity, multiply_money, Currency, Money, OrderId,
 };
-use ordering_rs::infrastructure::acl::external_gateways::{
-    extract_http_status, InventoryGateway, PaymentGateway,
+use ordering_rs::infrastructure::acl::inventory::inventory_gateway::{
+    extract_http_status, InventoryGateway,
 };
-use ordering_rs::infrastructure::drivers::http_driver::HttpJsonDriver;
-use ordering_rs::infrastructure::drivers::kv_driver::KeyValueStorageDriver;
-use ordering_rs::infrastructure::repository::driver_order_repository::DriverOrderRepository;
-use ordering_rs::infrastructure::repository::order_mapper::{decode_order_record, encode_order_record};
-use ordering_rs::presentation::order_web_server::serve_single_connection;
+use ordering_rs::infrastructure::acl::payment::payment_gateway::PaymentGateway;
+use ordering_rs::infrastructure::drivers::http::http_driver::HttpJsonDriver;
+use ordering_rs::infrastructure::drivers::kv::kv_driver::KeyValueStorageDriver;
+use ordering_rs::infrastructure::persistence::order::driver_order_repository::DriverOrderRepository;
+use ordering_rs::infrastructure::persistence::order::order_mapper::{decode_order_record, encode_order_record};
+use ordering_rs::presentation::web::order::order_web_server::serve_single_connection;
 use std::collections::HashMap;
 use std::io::{self, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -152,6 +156,7 @@ fn unwrap_err<T: std::fmt::Debug, E: std::fmt::Debug>(res: DomainResult<T, E>) -
     }
 }
 
+/// UT-ORD-001 UT-ORD-002 UT-ORD-003 UT-ORD-004 UT-ORD-005 UT-ORD-006 UT-ORD-007 UT-ORD-008 UT-ORD-009 UT-ORD-010 UT-ORD-011 UT-ORD-012 UT-ORD-013
 #[test]
 fn domain_all_branches() {
     assert_eq!(unwrap_err(create_order_id(" ")).code, "INVALID_ORDER_ID");
@@ -228,6 +233,7 @@ fn domain_all_branches() {
     assert_eq!(unwrap_err(canc.cancel()).code, "INVALID_ORDER_STATE");
 }
 
+/// UT-ORD-014 UT-ORD-015 UT-ORD-016 UT-ORD-017 UT-ORD-018 UT-ORD-019 UT-ORD-020
 #[test]
 fn infrastructure_all_branches() {
     let oid = unwrap_ok(create_order_id("ORD-100"));
@@ -288,6 +294,7 @@ fn infrastructure_all_branches() {
     assert_eq!(unwrap_err(PaymentGateway::new(MockHttp { response: Err("timeout".into()) }, "http://pay").charge(&oid, order.total_amount())).code, "EXTERNAL_TIMEOUT");
 }
 
+/// UT-ORD-021 UT-ORD-022 UT-ORD-023 UT-ORD-024 UT-ORD-025 UT-ORD-026
 #[test]
 fn application_scenarios() {
     let repo = InMemoryRepo::new();
@@ -338,6 +345,7 @@ fn send_raw_http(addr: std::net::SocketAddr, req: &str) -> String {
     out
 }
 
+/// UT-ORD-027 UT-ORD-028 UT-ORD-029 UT-ORD-030 UT-ORD-031
 #[test]
 fn presentation_browser_all_branches() {
     let draft = OrderSummaryDto {
@@ -373,7 +381,7 @@ fn presentation_browser_all_branches() {
             if stop_srv.load(Ordering::SeqCst) {
                 break;
             }
-            serve_single_connection(stream, &uc);
+            serve_single_connection(stream, &uc, &EN_MESSAGES);
         }
     });
 
@@ -440,4 +448,16 @@ fn presentation_browser_all_branches() {
     stop.store(true, Ordering::SeqCst);
     let _ = TcpStream::connect(addr);
     handle.join().unwrap();
+}
+
+/// UT-ORD-031
+#[test]
+fn presentation_renders_ja_and_en_catalogs() {
+    use ordering_rs::presentation::web::order::order_web_server::render_create_order_page;
+    let ja_html = render_create_order_page(None, &JA_MESSAGES);
+    assert!(ja_html.contains("<html lang='ja'>"));
+    assert!(ja_html.contains("注文作成"));
+    let en_html = render_create_order_page(None, &EN_MESSAGES);
+    assert!(en_html.contains("<html lang='en'>"));
+    assert!(en_html.contains("Place Order"));
 }

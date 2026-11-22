@@ -1,5 +1,5 @@
-use crate::domain::errors::DomainError;
-use crate::domain::result::DomainResult;
+use crate::domain::shared::errors::DomainError;
+use crate::domain::shared::result::DomainResult;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Currency {

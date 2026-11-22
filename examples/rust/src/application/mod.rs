@@ -1,1 +1,2 @@
-pub mod order_service;
+pub mod order;
+pub mod shared;

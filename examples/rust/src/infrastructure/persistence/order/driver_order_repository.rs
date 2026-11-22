@@ -1,10 +1,10 @@
-use crate::domain::errors::DomainError;
-use crate::domain::order::Order;
-use crate::domain::ports::OrderRepository;
-use crate::domain::result::DomainResult;
-use crate::domain::value_objects::OrderId;
-use crate::infrastructure::drivers::kv_driver::KeyValueStorageDriver;
-use crate::infrastructure::repository::order_mapper::{decode_order_record, encode_order_record};
+use crate::domain::shared::errors::DomainError;
+use crate::domain::order::order::Order;
+use crate::domain::order::order_repository::OrderRepository;
+use crate::domain::shared::result::DomainResult;
+use crate::domain::shared::value_objects::OrderId;
+use crate::infrastructure::drivers::kv::kv_driver::KeyValueStorageDriver;
+use crate::infrastructure::persistence::order::order_mapper::{decode_order_record, encode_order_record};
 use std::io::ErrorKind;
 
 pub struct DriverOrderRepository<D: KeyValueStorageDriver> {

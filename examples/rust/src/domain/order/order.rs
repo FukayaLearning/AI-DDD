@@ -1,6 +1,6 @@
-use crate::domain::errors::DomainError;
-use crate::domain::result::DomainResult;
-use crate::domain::value_objects::{multiply_money, CustomerId, Money, OrderId, ProductId, Quantity};
+use crate::domain::shared::errors::DomainError;
+use crate::domain::shared::result::DomainResult;
+use crate::domain::shared::value_objects::{multiply_money, CustomerId, Money, OrderId, ProductId, Quantity};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
