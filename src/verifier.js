@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { DEFAULT_MAX_FILES_PER_DIR, loadProjectConfig } from "./config.js";
 
 const INLINE_IGNORE_PATTERNS = [
   { name: "istanbul ignore", regex: /istanbul\s+ignore/i },
@@ -19,6 +20,8 @@ const ALLOWED_LAYER_DEPS = {
 };
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".mts", ".js", ".mjs", ".py", ".go", ".rs"]);
+const MODULE_DECLARATION_FILES = new Set(["mod.rs", "lib.rs", "__init__.py"]);
+const SUBDIVIDED_LAYERS = new Set(["domain", "application", "infrastructure", "presentation"]);
 
 function walkFiles(dir, results = []) {
   if (!fs.existsSync(dir)) return results;
@@ -129,6 +132,78 @@ function detectLayer(relPath) {
   if (/^(src|internal)\/presentation(\/|$)/.test(norm)) return "presentation";
   if (/^(src\/main\.(ts|mts|js|mjs|py|rs)|cmd\/.+\.go)$/.test(norm)) return "main";
   return null;
+}
+
+function detectLayerSubpath(relPath) {
+  const norm = relPath.replace(/\\/g, "/");
+  const m = norm.match(/^(?:src|internal)\/(domain|application|infrastructure|presentation)\/(.+)$/);
+  if (!m) return null;
+  const layer = m[1];
+  const rest = m[2];
+  const parts = rest.split("/");
+  return { layer, parts, isLooseRootFile: parts.length === 1, moduleName: parts[0] };
+}
+
+function extractDomainAggregateDeps(rawCode, ext, relPath) {
+  const code = ext === ".rs" ? isRustModTestBlockRemoved(rawCode) : rawCode;
+  const sub = detectLayerSubpath(relPath);
+  if (!sub || sub.layer !== "domain" || sub.isLooseRootFile || sub.moduleName === "shared") {
+    return [];
+  }
+  const selfAgg = sub.moduleName;
+  const found = new Set();
+
+  if (ext === ".ts" || ext === ".mts" || ext === ".js" || ext === ".mjs") {
+    const importRegex = /(?:import|export)\s+(?:[^"']*?\s+from\s+)?["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)/g;
+    let m;
+    while ((m = importRegex.exec(code)) !== null) {
+      const spec = m[1] || m[2];
+      if (!spec.startsWith(".")) continue;
+      const resolved = path.posix.normalize(
+        path.posix.join("/", path.posix.dirname(relPath.replace(/\\/g, "/")), spec)
+      );
+      const dm = resolved.match(/^\/(?:src|internal)\/domain\/([^/]+)(?:\/|$)/);
+      if (dm && dm[1] !== selfAgg && dm[1] !== "shared") {
+        found.add(dm[1]);
+      }
+    }
+  } else if (ext === ".py") {
+    const pyRegex = /^\s*(?:from\s+([.\w]+)\s+import|import\s+([\w.,\s]+))/gm;
+    let m;
+    while ((m = pyRegex.exec(code)) !== null) {
+      const modText = m[1] || m[2];
+      const dm = modText.match(/(?:^|\.)domain\.([a-zA-Z0-9_]+)/);
+      if (dm && dm[1] !== selfAgg && dm[1] !== "shared") {
+        found.add(dm[1]);
+      }
+      const relM = modText.match(/^\.\.([a-zA-Z0-9_]+)/);
+      if (relM && relM[1] !== selfAgg && relM[1] !== "shared") {
+        found.add(relM[1]);
+      }
+    }
+  } else if (ext === ".go") {
+    const importBlock = code.match(/import\s*(?:\([^)]*\)|"[^"]+")/g) || [];
+    for (const block of importBlock) {
+      const goRegex = /["']([^"']+)["']/g;
+      let m;
+      while ((m = goRegex.exec(block)) !== null) {
+        const dm = m[1].match(/\/internal\/domain\/([^/"']+)/);
+        if (dm && dm[1] !== selfAgg && dm[1] !== "shared") {
+          found.add(dm[1]);
+        }
+      }
+    }
+  } else if (ext === ".rs") {
+    const rustRegex = /\b(?:use\s+)?crate::domain::([a-zA-Z0-9_]+)(?:::|;|\b)/g;
+    let m;
+    while ((m = rustRegex.exec(code)) !== null) {
+      if (m[1] !== selfAgg && m[1] !== "shared") {
+        found.add(m[1]);
+      }
+    }
+  }
+
+  return [...found];
 }
 
 function isDriverFile(relPath) {
@@ -271,10 +346,18 @@ export function verifyProject(targetDir) {
   if (!fs.existsSync(ulPath)) errors.push("Missing docs/domain/ubiquitous-language.md");
   if (!fs.existsSync(cmPath)) errors.push("Missing docs/domain/context-map.md");
 
+  const loadedCfg = loadProjectConfig(absTarget);
+  if (loadedCfg.error) {
+    errors.push(`Invalid ${path.basename(loadedCfg.path)}: ${loadedCfg.error}`);
+  }
+  const maxFilesPerDir =
+    loadedCfg.config?.structure?.maxFilesPerDirectory ?? DEFAULT_MAX_FILES_PER_DIR;
+
   // 2. Scan source files
   const allFiles = walkFiles(absTarget);
   let filesChecked = 0;
   let driverFilesChecked = 0;
+  const dirFileCounts = new Map();
 
   for (const file of allFiles) {
     const rel = path.relative(absTarget, file).replace(/\\/g, "/");
@@ -289,7 +372,26 @@ export function verifyProject(targetDir) {
     }
 
     filesChecked++;
+    const relDir = path.posix.dirname(rel);
+    dirFileCounts.set(relDir, (dirFileCounts.get(relDir) || 0) + 1);
     const content = fs.readFileSync(file, "utf8");
+
+    // Structure rules: no loose files at layer roots & aggregate isolation
+    const subpath = detectLayerSubpath(rel);
+    if (subpath && SUBDIVIDED_LAYERS.has(subpath.layer)) {
+      if (subpath.isLooseRootFile && !MODULE_DECLARATION_FILES.has(path.posix.basename(rel))) {
+        errors.push(
+          `[Loose Layer File] ${rel} (layer '${subpath.layer}'): place source files inside a module subdirectory (e.g., ${subpath.layer}/shared/ or ${subpath.layer}/<module>/)`
+        );
+      }
+      if (subpath.layer === "domain") {
+        for (const otherAgg of extractDomainAggregateDeps(content, ext, rel)) {
+          errors.push(
+            `[Aggregate Isolation Violation] ${rel}: domain/${subpath.moduleName}/ MUST NOT depend on domain/${otherAgg}/ (reference via IDs in domain/shared/)`
+          );
+        }
+      }
+    }
 
     // Inline coverage ignore check (checked even in comments!)
     for (const rule of INLINE_IGNORE_PATTERNS) {
@@ -325,6 +427,14 @@ export function verifyProject(targetDir) {
 
   if (filesChecked === 0) {
     errors.push("No source files found under src/ or internal/ to verify");
+  }
+
+  for (const [dirName, count] of dirFileCounts.entries()) {
+    if (count > maxFilesPerDir) {
+      warnings.push(
+        `[Directory Size Warning] ${dirName} has ${count} source files (threshold: ${maxFilesPerDir}); consider subdividing further`
+      );
+    }
   }
 
   // 3. Centralized exclusion config validation (only drivers/ and main may be excluded)

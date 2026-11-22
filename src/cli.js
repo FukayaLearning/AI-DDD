@@ -191,10 +191,16 @@ export async function runCli(argv) {
       console.log(
         `PASS: Governance verification succeeded for ${report.target} (${report.stats.filesChecked} source files, ${report.stats.driverFilesChecked} driver files checked)`
       );
+      for (const warn of report.warnings) {
+        console.warn(`  WARN: ${warn}`);
+      }
     } else {
       console.error(`FAIL: Governance verification failed for ${report.target}:`);
       for (const err of report.errors) {
         console.error(`  - ${err}`);
+      }
+      for (const warn of report.warnings) {
+        console.warn(`  WARN: ${warn}`);
       }
     }
     return report.ok ? 0 : 1;
