@@ -1,5 +1,5 @@
-import { domainError, type DomainError } from "./errors.ts";
-import { err, ok, type Result } from "./result.ts";
+import { domainError, type DomainError } from "../shared/errors.ts";
+import { err, ok, type Result } from "../shared/result.ts";
 import {
   addMoney,
   createMoney,
@@ -9,7 +9,7 @@ import {
   type OrderId,
   type ProductId,
   type Quantity,
-} from "./value_objects.ts";
+} from "../shared/value_objects.ts";
 
 export type OrderStatus = "Draft" | "Confirmed" | "Cancelled";
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { Order } from "../../src/domain/order.ts";
+import { Order } from "../../src/domain/order/order.ts";
 import {
   addMoney,
   createCustomerId,
@@ -8,7 +8,7 @@ import {
   createProductId,
   createQuantity,
   multiplyMoney,
-} from "../../src/domain/value_objects.ts";
+} from "../../src/domain/shared/value_objects.ts";
 
 export async function run() {
   assert.equal(createOrderId(" ").ok, false);

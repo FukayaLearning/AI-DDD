@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { domainError } from "../../src/domain/errors.ts";
-import { err, ok } from "../../src/domain/result.ts";
-import { startOrderWebServer } from "../../src/presentation/order_web_server.ts";
+import { domainError } from "../../src/domain/shared/errors.ts";
+import { err, ok } from "../../src/domain/shared/result.ts";
+import { startOrderWebServer } from "../../src/presentation/web/order/order_web_server.ts";
 import { launchHeadlessBrowser } from "../../scripts/browser-helper.mjs";
 
 export async function run() {

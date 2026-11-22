@@ -1,10 +1,11 @@
 import path from "node:path";
-import { OrderApplicationService } from "./application/order_service.ts";
-import { InventoryGateway, PaymentGateway } from "./infrastructure/acl/external_gateways.ts";
-import { FetchHttpJsonDriver } from "./infrastructure/drivers/http_driver.ts";
-import { FileKvDriver } from "./infrastructure/drivers/kv_driver.ts";
-import { DriverOrderRepository } from "./infrastructure/repository/driver_order_repository.ts";
-import { startOrderWebServer } from "./presentation/order_web_server.ts";
+import { OrderApplicationService } from "./application/order/commands/order_service.ts";
+import { InventoryGateway } from "./infrastructure/acl/inventory/inventory_gateway.ts";
+import { PaymentGateway } from "./infrastructure/acl/payment/payment_gateway.ts";
+import { FetchHttpJsonDriver } from "./infrastructure/drivers/http/http_driver.ts";
+import { FileKvDriver } from "./infrastructure/drivers/kv/kv_driver.ts";
+import { DriverOrderRepository } from "./infrastructure/persistence/order/driver_order_repository.ts";
+import { startOrderWebServer } from "./presentation/web/order/order_web_server.ts";
 
 export function createOrderingApp(options: {
   dataDir: string;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { OrderApplicationService } from "../../src/application/order_service.ts";
-import { domainError } from "../../src/domain/errors.ts";
-import { err, ok } from "../../src/domain/result.ts";
+import { OrderApplicationService } from "../../src/application/order/commands/order_service.ts";
+import { domainError } from "../../src/domain/shared/errors.ts";
+import { err, ok } from "../../src/domain/shared/result.ts";
 
 function makeInMemoryRepo(failSave = false) {
   const map = new Map();

@@ -1,7 +1,7 @@
-import type { DomainError } from "../domain/errors.ts";
-import { Order, type OrderLine } from "../domain/order.ts";
-import type { InventoryPort, OrderRepository, PaymentPort } from "../domain/ports.ts";
-import { err, ok, type Result } from "../domain/result.ts";
+import type { DomainError } from "../../../domain/shared/errors.ts";
+import { Order, type OrderLine } from "../../../domain/order/order.ts";
+import type { OrderRepository } from "../../../domain/order/order_repository.ts";
+import { err, ok, type Result } from "../../../domain/shared/result.ts";
 import {
   createCustomerId,
   createMoney,
@@ -10,7 +10,8 @@ import {
   createQuantity,
   type Currency,
   type Money,
-} from "../domain/value_objects.ts";
+} from "../../../domain/shared/value_objects.ts";
+import type { InventoryPort, PaymentPort } from "../../shared/ports.ts";
 
 export interface PlaceOrderLineInput {
   readonly productId: string;

@@ -1,21 +1,19 @@
 import assert from "node:assert/strict";
-import { Order } from "../../src/domain/order.ts";
+import { Order } from "../../src/domain/order/order.ts";
 import {
   createCustomerId,
   createMoney,
   createOrderId,
   createProductId,
   createQuantity,
-} from "../../src/domain/value_objects.ts";
-import {
-  InventoryGateway,
-  PaymentGateway,
-} from "../../src/infrastructure/acl/external_gateways.ts";
-import { DriverOrderRepository } from "../../src/infrastructure/repository/driver_order_repository.ts";
+} from "../../src/domain/shared/value_objects.ts";
+import { InventoryGateway } from "../../src/infrastructure/acl/inventory/inventory_gateway.ts";
+import { PaymentGateway } from "../../src/infrastructure/acl/payment/payment_gateway.ts";
+import { DriverOrderRepository } from "../../src/infrastructure/persistence/order/driver_order_repository.ts";
 import {
   fromOrderRecord,
   toOrderRecord,
-} from "../../src/infrastructure/repository/order_mapper.ts";
+} from "../../src/infrastructure/persistence/order/order_mapper.ts";
 
 export async function run() {
   const oid = createOrderId("ORD-100").value;

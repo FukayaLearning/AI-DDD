@@ -1,6 +1,6 @@
-import { domainError, type DomainError } from "../../domain/errors.ts";
-import { Order, type DomainEvent, type OrderLine, type OrderStatus } from "../../domain/order.ts";
-import { err, type Result } from "../../domain/result.ts";
+import { domainError, type DomainError } from "../../../domain/shared/errors.ts";
+import { Order, type DomainEvent, type OrderLine, type OrderStatus } from "../../../domain/order/order.ts";
+import { err, type Result } from "../../../domain/shared/result.ts";
 import {
   createCustomerId,
   createMoney,
@@ -8,7 +8,7 @@ import {
   createProductId,
   createQuantity,
   type Currency,
-} from "../../domain/value_objects.ts";
+} from "../../../domain/shared/value_objects.ts";
 
 export interface OrderRecord {
   readonly id: string;

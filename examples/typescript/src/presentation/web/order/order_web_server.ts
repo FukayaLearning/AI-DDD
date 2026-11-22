@@ -1,7 +1,7 @@
 import http from "node:http";
-import type { OrderSummaryDto, OrderUseCases } from "../application/order_service.ts";
-import type { DomainError } from "../domain/errors.ts";
-import type { Currency } from "../domain/value_objects.ts";
+import type { OrderSummaryDto, OrderUseCases } from "../../../application/order/commands/order_service.ts";
+import type { DomainError } from "../../../domain/shared/errors.ts";
+import type { Currency } from "../../../domain/shared/value_objects.ts";
 
 function escapeHtml(text: string): string {
   return text
