@@ -3,6 +3,7 @@ import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { initProject, installSchema } from "./installer.js";
 import { deriveContextCode, normalizeLocale } from "./config.js";
+import { stampTranslationFile } from "./i18n.js";
 import { verifyProject } from "./verifier.js";
 
 const VALID_LANGS = new Set(["typescript", "python", "go", "rust"]);
@@ -13,7 +14,8 @@ function printHelp() {
 
 Usage:
   ai-ddd init [options]             Initialize a repository with ddd-driven OpenSpec + clean 4-layer DDD skeleton
-  ai-ddd verify [options]           Verify layer dependencies, inline coverage ignores, and branchless drivers/
+  ai-ddd verify [options]           Verify layer dependencies, structure, i18n, test specs, and drivers/
+  ai-ddd i18n stamp [options] <file> Stamp a translation file with its master SHA-256 hash
   ai-ddd install-schema [options]   Deploy or update the ddd-driven OpenSpec schema
 
 Options for 'init':
@@ -204,6 +206,23 @@ export async function runCli(argv) {
       }
     }
     return report.ok ? 0 : 1;
+  }
+
+  if (command === "i18n") {
+    const sub = flags._[0];
+    const fileArg = flags._[1];
+    if (sub !== "stamp" || !fileArg) {
+      console.error("Usage: ai-ddd i18n stamp [--target <dir>] <translation-file>");
+      return 1;
+    }
+    try {
+      const res = stampTranslationFile(flags.target || ".", fileArg);
+      console.log(`Stamped ${res.translation} (sha256=${res.sha256.slice(0, 12)}...)`);
+      return 0;
+    } catch (err) {
+      console.error(`i18n stamp failed: ${err.message}`);
+      return 1;
+    }
   }
 
   if (command === "install-schema") {
