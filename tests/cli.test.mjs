@@ -62,6 +62,12 @@ function runShell(cmd, args, cwd) {
     assert.match(skillText, /Git Branching & Per-Task Commit Discipline/);
     assert.match(skillText, /1-Task = 1-Commit Rule/);
 
+    assert.ok(fs.existsSync(path.join(dir, "AGENTS.md")));
+    const agentsText = fs.readFileSync(path.join(dir, "AGENTS.md"), "utf8");
+    assert.match(agentsText, /Route All Change Requests Through OpenSpec Skills/);
+    assert.match(agentsText, /Explicit Opt-Out Only/);
+    assert.match(agentsText, /1-Task = 1-Commit Rule/);
+
     // Static verify passes
     const vOut = runNodeCli(["verify", "--target", dir]);
     assert.match(vOut, /PASS:/);

@@ -37,3 +37,11 @@ When the target project is under Git version control, the `ddd-driven` schema an
 - **GIVEN** a change ready for `openspec-apply` under the `ddd-driven` schema
 - **WHEN** evaluating Git management instructions before and during task execution
 - **THEN** Git-managed repositories prompt for branch creation and commit post-propose artifacts first followed by one commit per completed task, while non-Git repositories skip Git operations
+
+### Requirement: Default OpenSpec skill routing via AGENTS.md
+The repository root and `ai-ddd init` generated projects SHALL provide an `AGENTS.md` instruction file that translates change requests into OpenSpec skill workflows (`openspec-explore`, `openspec-propose`, `openspec-update-change`, `openspec-apply-change`, `openspec-sync-specs`, `openspec-archive-change`) by default, permitting direct file edits only when the user explicitly instructs to omit OpenSpec.
+
+#### Scenario: Direct edits require explicit OpenSpec opt-out
+- **GIVEN** a repository containing the generated or root `AGENTS.md`
+- **WHEN** a user requests a code or documentation change without naming an OpenSpec skill or explicitly opting out
+- **THEN** the agent routes the request through the matching OpenSpec skill workflow and performs direct file edits without OpenSpec only upon an explicit user opt-out instruction
