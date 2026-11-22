@@ -165,17 +165,17 @@ function runShell(cmd, args, cwd) {
 
     // (a) presentation importing infrastructure
     fs.appendFileSync(
-      path.join(dir, "src", "presentation", "web_server.ts"),
-      '\nimport { SystemClockDriver } from "../infrastructure/drivers/clock_driver.ts";\n'
+      path.join(dir, "src", "presentation", "web", "health", "web_server.ts"),
+      '\nimport { SystemClockDriver } from "../../../infrastructure/drivers/clock/clock_driver.ts";\n'
     );
     // (b) inline ignore comment
     fs.appendFileSync(
-      path.join(dir, "src", "domain", "result.ts"),
+      path.join(dir, "src", "domain", "shared", "result.ts"),
       "\n// v8 ignore next\n"
     );
     // (c) branch in drivers/
     fs.writeFileSync(
-      path.join(dir, "src", "infrastructure", "drivers", "clock_driver.ts"),
+      path.join(dir, "src", "infrastructure", "drivers", "clock", "clock_driver.ts"),
       'export class SystemClockDriver { async readSystemIso() { if (true) { return "x"; } return "y"; } }\n'
     );
     // (d) unauthorized coverage exclude
@@ -226,6 +226,12 @@ function runShell(cmd, args, cwd) {
     assert.match(openspecCfg, /Master=en, User=ja/);
     const agentsText = fs.readFileSync(path.join(jaDir, "AGENTS.md"), "utf8");
     assert.match(agentsText, /user locale is `ja`/);
+    const vOut = runNodeCli(["verify", "--target", jaDir]);
+    assert.match(vOut, /PASS:/);
+    const tOut = runNodeCli(["trace", "--target", jaDir, "--check"]);
+    assert.match(tOut, /Generated/);
+    runShell("npm", ["run", "test:unit"], jaDir);
+    runShell("npm", ["run", "test:integration"], jaDir);
   } finally {
     fs.rmSync(jaDir, { recursive: true, force: true });
   }

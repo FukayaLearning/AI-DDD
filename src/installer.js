@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { buildProjectConfig, CONFIG_FILENAME } from "./config.js";
 import { generateSkeletonFiles } from "./skeletons.js";
+import { generateSkeletonDocs } from "./skeletons/common_docs.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const PLATFORM_ROOT = path.resolve(__dirname, "..");
@@ -230,49 +231,27 @@ export function initProject(options) {
     "utf8"
   );
 
-  // 6. Generate strategic DDD docs (Ubiquitous Language & Context Map)
-  const domainDocsDir = path.join(absTarget, "docs", "domain");
-  fs.mkdirSync(domainDocsDir, { recursive: true });
-
-  fs.writeFileSync(
-    path.join(domainDocsDir, "ubiquitous-language.md"),
-    `# Ubiquitous Language — ${contextName}
-
-> Single Bounded Context repository: **${projectName}** (\`${contextName}\`)
-> Every term defined here MUST match identifiers in OpenSpec specs, domain code, and tests.
-
-| Term (English Identifier) | Domain Meaning | Layer / Pattern | Notes |
-| :--- | :--- | :--- | :--- |
-| \`Result<T, E>\` | Explicit success (\`Ok\`) or typed failure (\`Err\`) | Domain Base | All expected errors are values |
-| \`HealthStatus\` | Operational status of this Bounded Context service | Domain Value Object | Clean skeleton baseline |
-`,
-    "utf8"
-  );
-
-  fs.writeFileSync(
-    path.join(domainDocsDir, "context-map.md"),
-    `# Context Map — ${contextName}
-
-- **Owned Bounded Context**: \`${contextName}\` (this repository: \`${projectName}\`)
-- **Cross-Repository OpenSpec Federation**: \`T.B.D.\`
-
-## External Context Relationships
-
-| Upstream / External Context | Repository | Relationship / Pattern | Domain Port / ACL | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| *(Add external Bounded Contexts here as ports are introduced)* | Separate Repository | ACL / Customer-Supplier | \`domain/ports\` | \`T.B.D.\` |
-`,
-    "utf8"
-  );
-
-  // 7. Generate clean 4-layer skeleton for selected language & distribution mode
-  const skeletonFiles = generateSkeletonFiles({
+  // 6. Generate strategic DDD docs, baseline spec, test specs, and translations
+  const docFiles = generateSkeletonDocs({
     projectName,
     contextName,
-    lang,
-    dist,
-    cliPath: path.join(PLATFORM_ROOT, "bin", "ai-ddd.js"),
+    contextCode: projectConfig.context.code,
+    locale: projectConfig.locale.user,
   });
+
+  // 7. Generate clean 4-layer skeleton for selected language & distribution mode
+  const skeletonFiles = {
+    ...docFiles,
+    ...generateSkeletonFiles({
+      projectName,
+      contextName,
+      contextCode: projectConfig.context.code,
+      locale: projectConfig.locale.user,
+      lang,
+      dist,
+      cliPath: path.join(PLATFORM_ROOT, "bin", "ai-ddd.js"),
+    }),
+  };
 
   for (const [relPath, content] of Object.entries(skeletonFiles)) {
     const fullPath = path.join(absTarget, relPath);

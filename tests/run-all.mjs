@@ -11,6 +11,10 @@ execFileSync(process.execPath, [path.join(ROOT, "tests", "cli.test.mjs")], {
   cwd: ROOT,
   stdio: "inherit",
 });
+execFileSync(process.execPath, [path.join(ROOT, "tests", "governance.test.mjs")], {
+  cwd: ROOT,
+  stdio: "inherit",
+});
 
 const examplesDir = path.join(ROOT, "examples");
 if (fs.existsSync(examplesDir)) {

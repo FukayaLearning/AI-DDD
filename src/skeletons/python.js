@@ -1,4 +1,5 @@
-export function generatePythonSkeleton({ projectName, contextName, dist, cliPath }) {
+export function generatePythonSkeleton({ projectName, contextName, contextCode = "CTX", locale = "en", dist, cliPath }) {
+  const C = contextCode;
   const files = {};
 
   files["pyproject.toml"] = `[project]
@@ -20,13 +21,22 @@ fail_under = 100
 
   files["src/__init__.py"] = "";
   files["src/domain/__init__.py"] = "";
+  files["src/domain/shared/__init__.py"] = "";
+  files["src/domain/health/__init__.py"] = "";
   files["src/application/__init__.py"] = "";
+  files["src/application/health/__init__.py"] = "";
+  files["src/application/health/queries/__init__.py"] = "";
   files["src/infrastructure/__init__.py"] = "";
   files["src/infrastructure/drivers/__init__.py"] = "";
-  files["src/infrastructure/repository/__init__.py"] = "";
+  files["src/infrastructure/drivers/clock/__init__.py"] = "";
+  files["src/infrastructure/persistence/__init__.py"] = "";
+  files["src/infrastructure/persistence/health/__init__.py"] = "";
   files["src/presentation/__init__.py"] = "";
+  files["src/presentation/web/__init__.py"] = "";
+  files["src/presentation/web/i18n/__init__.py"] = "";
+  files["src/presentation/web/health/__init__.py"] = "";
 
-  files["src/domain/result.py"] = `from dataclasses import dataclass
+  files["src/domain/shared/result.py"] = `from dataclasses import dataclass
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
@@ -48,9 +58,9 @@ class Err(Generic[E]):
 Result = Ok[T] | Err[E]
 `;
 
-  files["src/domain/health.py"] = `from dataclasses import dataclass
+  files["src/domain/health/health.py"] = `from dataclasses import dataclass
 from typing import Protocol
-from src.domain.result import Err, Ok, Result
+from src.domain.shared.result import Err, Ok, Result
 
 
 @dataclass(frozen=True)
@@ -76,15 +86,16 @@ class ClockPort(Protocol):
     def current_iso(self) -> Result[str, DomainError]: ...
 `;
 
-  files["src/application/get_health.py"] = `from typing import Protocol
-from src.domain.health import ClockPort, DomainError, HealthStatus, create_health_status
-from src.domain.result import Err, Result
+  files["src/application/health/queries/get_health.py"] = `from typing import Protocol
+from src.domain.health.health import ClockPort, DomainError, HealthStatus, create_health_status
+from src.domain.shared.result import Err, Result
 
 
 class GetHealthUseCase(Protocol):
     def execute(self) -> Result[HealthStatus, DomainError]: ...
 
 
+# @implements REQ-${C}-001
 class CheckHealthService:
     def __init__(self, context_name: str, clock: ClockPort) -> None:
         self._context_name = context_name
@@ -97,7 +108,7 @@ class CheckHealthService:
         return create_health_status(self._context_name, now_result.value)
 `;
 
-  files["src/infrastructure/drivers/clock_driver.py"] = `from datetime import datetime, timezone
+  files["src/infrastructure/drivers/clock/clock_driver.py"] = `from datetime import datetime, timezone
 from typing import Protocol
 
 
@@ -110,8 +121,8 @@ class SystemClockDriver:
         return datetime.now(timezone.utc).isoformat()
 `;
 
-  files["src/infrastructure/repository/clock_mapper.py"] = `from src.domain.health import DomainError
-from src.domain.result import Err, Ok, Result
+  files["src/infrastructure/persistence/health/clock_mapper.py"] = `from src.domain.health.health import DomainError
+from src.domain.shared.result import Err, Ok, Result
 
 
 def map_raw_timestamp(raw: str) -> Result[str, DomainError]:
@@ -121,10 +132,10 @@ def map_raw_timestamp(raw: str) -> Result[str, DomainError]:
     return Ok(trimmed)
 `;
 
-  files["src/infrastructure/repository/system_clock_adapter.py"] = `from src.domain.health import DomainError
-from src.domain.result import Err, Result
-from src.infrastructure.drivers.clock_driver import RawClockDriver
-from src.infrastructure.repository.clock_mapper import map_raw_timestamp
+  files["src/infrastructure/persistence/health/system_clock_adapter.py"] = `from src.domain.health.health import DomainError
+from src.domain.shared.result import Err, Result
+from src.infrastructure.drivers.clock.clock_driver import RawClockDriver
+from src.infrastructure.persistence.health.clock_mapper import map_raw_timestamp
 
 
 class SystemClockAdapter:
@@ -139,20 +150,44 @@ class SystemClockAdapter:
         return map_raw_timestamp(raw)
 `;
 
-  files["src/presentation/web_server.py"] = `from contextlib import contextmanager
+  files["src/presentation/web/i18n/en.py"] = `MESSAGES = {
+    "locale": "en",
+    "healthyTitle": "Service Healthy",
+    "unavailableTitle": "Service Unavailable",
+    "notFoundTitle": "Not Found",
+    "notFoundBody": "Page Not Found",
+}
+`;
+
+  if (locale !== "en") {
+    const isJa = locale === "ja";
+    files[`src/presentation/web/i18n/${locale}.py`] = `MESSAGES = {
+    "locale": ${JSON.stringify(locale)},
+    "healthyTitle": ${JSON.stringify(isJa ? "サービス正常" : `[${locale}] Service Healthy`)},
+    "unavailableTitle": ${JSON.stringify(isJa ? "サービス利用不可" : `[${locale}] Service Unavailable`)},
+    "notFoundTitle": ${JSON.stringify(isJa ? "見つかりません" : `[${locale}] Not Found`)},
+    "notFoundBody": ${JSON.stringify(isJa ? "ページが見つかりません" : `[${locale}] Page Not Found`)},
+}
+`;
+  }
+
+  files["src/presentation/web/health/web_server.py"] = `from contextlib import contextmanager
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from typing import Iterator
-from src.application.get_health import GetHealthUseCase
-from src.domain.result import Err
+from typing import Dict, Iterator, Optional
+from src.application.health.queries.get_health import GetHealthUseCase
+from src.domain.shared.result import Err
+from src.presentation.web.i18n.en import MESSAGES as EN_MESSAGES
 
 
-def render_html(title: str, body: str) -> str:
-    return f"<!doctype html><html lang='en'><head><meta charset='utf-8'><title>{escape(title)}</title></head><body>{body}</body></html>"
+def render_html(locale: str, title: str, body: str) -> str:
+    return f"<!doctype html><html lang='{escape(locale)}'><head><meta charset='utf-8'><title>{escape(title)}</title></head><body>{body}</body></html>"
 
 
-def make_handler(use_case: GetHealthUseCase):
+def make_handler(use_case: GetHealthUseCase, messages: Dict[str, str] = EN_MESSAGES):
+    msg = messages
+
     class HealthHandler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: object) -> None:
             return
@@ -162,18 +197,20 @@ def make_handler(use_case: GetHealthUseCase):
                 result = use_case.execute()
                 if isinstance(result, Err):
                     html = render_html(
-                        "Service Unavailable",
+                        msg["locale"],
+                        msg["unavailableTitle"],
                         f"<main><div data-testid='error-banner'>{escape(result.error.code)}: {escape(result.error.message)}</div></main>",
                     )
                     self._send(503, html)
                     return
                 html = render_html(
-                    "Service Healthy",
+                    msg["locale"],
+                    msg["healthyTitle"],
                     f"<main><h1 data-testid='health-status'>OK: {escape(result.value.context)}</h1><p data-testid='checked-at'>{escape(result.value.checked_at_iso)}</p></main>",
                 )
                 self._send(200, html)
                 return
-            self._send(404, render_html("Not Found", "<main><p data-testid='not-found'>Page Not Found</p></main>"))
+            self._send(404, render_html(msg["locale"], msg["notFoundTitle"], f"<main><p data-testid='not-found'>{escape(msg['notFoundBody'])}</p></main>"))
 
         def _send(self, status: int, html: str) -> None:
             payload = html.encode("utf-8")
@@ -187,8 +224,8 @@ def make_handler(use_case: GetHealthUseCase):
 
 
 @contextmanager
-def run_presentation_server(use_case: GetHealthUseCase, port: int = 0) -> Iterator[str]:
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(use_case))
+def run_presentation_server(use_case: GetHealthUseCase, port: int = 0, messages: Dict[str, str] = EN_MESSAGES) -> Iterator[str]:
+    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(use_case, messages))
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -200,12 +237,19 @@ def run_presentation_server(use_case: GetHealthUseCase, port: int = 0) -> Iterat
         thread.join(timeout=2)
 `;
 
+  const pyMainSelect =
+    locale !== "en"
+      ? `    import importlib
+    active_locale = os.environ.get("APP_LOCALE", ${JSON.stringify(locale)})
+    messages = importlib.import_module("src.presentation.web.i18n.en").MESSAGES if active_locale == "en" else importlib.import_module(f"src.presentation.web.i18n.{active_locale}").MESSAGES`
+      : `    from src.presentation.web.i18n.en import MESSAGES as messages`;
+
   files["src/main.py"] = `import os
 from http.server import ThreadingHTTPServer
-from src.application.get_health import CheckHealthService
-from src.infrastructure.drivers.clock_driver import SystemClockDriver
-from src.infrastructure.repository.system_clock_adapter import SystemClockAdapter
-from src.presentation.web_server import make_handler
+from src.application.health.queries.get_health import CheckHealthService
+from src.infrastructure.drivers.clock.clock_driver import SystemClockDriver
+from src.infrastructure.persistence.health.system_clock_adapter import SystemClockAdapter
+from src.presentation.web.health.web_server import make_handler
 
 
 def create_app(context_name: str = "${contextName}") -> CheckHealthService:
@@ -216,8 +260,8 @@ def create_app(context_name: str = "${contextName}") -> CheckHealthService:
 
 def main() -> None:
     port = int(os.environ.get("PORT", "3000"))
-    use_case = create_app()
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(use_case))
+${pyMainSelect}
+    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(create_app(), messages))
     actual_port = server.server_address[1]
     print(f"LISTENING http://127.0.0.1:{actual_port}", flush=True)
     server.serve_forever()
@@ -237,7 +281,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-EXCLUDED = {"src/infrastructure/drivers/clock_driver.py", "src/main.py"}
+EXCLUDED = {"src/infrastructure/drivers/clock/clock_driver.py", "src/main.py"}
 
 
 def expected_branches(code):
@@ -437,12 +481,12 @@ try {
 import pathlib
 import subprocess
 import unittest
-from src.application.get_health import CheckHealthService
-from src.domain.health import DomainError, create_health_status
-from src.domain.result import Err, Ok
-from src.infrastructure.repository.clock_mapper import map_raw_timestamp
-from src.infrastructure.repository.system_clock_adapter import SystemClockAdapter
-from src.presentation.web_server import run_presentation_server
+from src.application.health.queries.get_health import CheckHealthService
+from src.domain.health.health import DomainError, create_health_status
+from src.domain.shared.result import Err, Ok
+from src.infrastructure.persistence.health.clock_mapper import map_raw_timestamp
+from src.infrastructure.persistence.health.system_clock_adapter import SystemClockAdapter
+from src.presentation.web.health.web_server import run_presentation_server
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 
@@ -477,19 +521,22 @@ class _ConfigurableMockUseCase:
 
 class TestSkeletonLayers(unittest.TestCase):
     def test_domain_and_application(self) -> None:
+        """UT-${C}-001, UT-${C}-002, UT-${C}-005, UT-${C}-006"""
         self.assertIsInstance(create_health_status("${contextName}", "2026-11-22T00:00:00Z"), Ok)
         self.assertIsInstance(create_health_status("${contextName}", "   "), Err)
         self.assertIsInstance(CheckHealthService("${contextName}", _OkClockPort()).execute(), Ok)
         self.assertIsInstance(CheckHealthService("${contextName}", _ErrClockPort()).execute(), Err)
 
     def test_infrastructure(self) -> None:
+        """UT-${C}-003, UT-${C}-004"""
         self.assertIsInstance(map_raw_timestamp("2026-11-22T00:00:00Z"), Ok)
         self.assertIsInstance(map_raw_timestamp(" "), Err)
         self.assertIsInstance(SystemClockAdapter(_OkDriver()).current_iso(), Ok)
         self.assertIsInstance(SystemClockAdapter(_ErrDriver()).current_iso(), Err)
 
     def test_presentation_browser_all_branches(self) -> None:
-        from src.domain.health import HealthStatus
+        """UT-${C}-007"""
+        from src.domain.health.health import HealthStatus
         mock_uc = _ConfigurableMockUseCase(Ok(HealthStatus(context="${contextName}", checked_at_iso="2026-11-22T00:00:00Z")))
         with run_presentation_server(mock_uc, 0) as base_url:
             scenarios = [
@@ -502,6 +549,10 @@ class TestSkeletonLayers(unittest.TestCase):
                 {"url": f"{base_url}/missing", "selector": "[data-testid='not-found']", "expected": "Page Not Found"},
             ]
             subprocess.run(["node", str(ROOT / "scripts" / "browser_driver.mjs"), json.dumps(scenarios_err)], check=True)
+${locale !== "en" ? `        import importlib
+        user_msg = importlib.import_module("src.presentation.web.i18n.${locale}").MESSAGES
+        with run_presentation_server(mock_uc, 0, user_msg) as base_url_loc:
+            subprocess.run(["node", str(ROOT / "scripts" / "browser_driver.mjs"), json.dumps([{"url": f"{base_url_loc}/", "selector": "[data-testid='error-banner']", "expected": "CLOCK_UNAVAILABLE: mock outage"}])], check=True)` : ""}
 `;
 
   if (dist === "docker") {
@@ -519,6 +570,7 @@ CMD ["python3", "-m", "src.main"]
 `;
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 if ! docker info >/dev/null 2>&1; then
   echo "ERROR: Docker daemon is not running; cannot execute Docker integration test." >&2
   exit 1
@@ -532,6 +584,7 @@ echo "PASS: Docker container integration test verified drivers/ and main.py"
   } else if (dist === "binary") {
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 python3 - <<'PY'
 import os, re, subprocess, time, urllib.request
 env = dict(os.environ, PORT="0")
@@ -559,9 +612,10 @@ PY
   } else {
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 python3 - <<'PY'
 from src.main import create_app
-from src.domain.result import Ok
+from src.domain.shared.result import Ok
 uc = create_app()
 res = uc.execute()
 assert isinstance(res, Ok) and res.value.context == "${contextName}"

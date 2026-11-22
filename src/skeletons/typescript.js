@@ -1,4 +1,5 @@
-export function generateTypeScriptSkeleton({ projectName, contextName, dist, cliPath }) {
+export function generateTypeScriptSkeleton({ projectName, contextName, contextCode = "CTX", locale = "en", dist, cliPath }) {
+  const C = contextCode;
   const files = {};
 
   files["package.json"] = JSON.stringify(
@@ -63,7 +64,7 @@ export default {
 `;
 
   // Domain layer (zero external imports)
-  files["src/domain/result.ts"] = `export type Result<T, E> =
+  files["src/domain/shared/result.ts"] = `export type Result<T, E> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: E };
 
@@ -76,8 +77,8 @@ export function err<T = never, E = unknown>(error: E): Result<T, E> {
 }
 `;
 
-  files["src/domain/health.ts"] = `import type { Result } from "./result.ts";
-import { err, ok } from "./result.ts";
+  files["src/domain/health/health.ts"] = `import type { Result } from "../shared/result.ts";
+import { err, ok } from "../shared/result.ts";
 
 export type DomainError =
   | { readonly code: "INVALID_TIMESTAMP"; readonly message: string }
@@ -105,15 +106,16 @@ export interface ClockPort {
 `;
 
   // Application layer (depends only on domain)
-  files["src/application/get_health.ts"] = `import type { ClockPort, DomainError, HealthStatus } from "../domain/health.ts";
-import { createHealthStatus } from "../domain/health.ts";
-import type { Result } from "../domain/result.ts";
-import { err } from "../domain/result.ts";
+  files["src/application/health/queries/get_health.ts"] = `import type { ClockPort, DomainError, HealthStatus } from "../../../domain/health/health.ts";
+import { createHealthStatus } from "../../../domain/health/health.ts";
+import type { Result } from "../../../domain/shared/result.ts";
+import { err } from "../../../domain/shared/result.ts";
 
 export interface GetHealthUseCase {
   execute(): Promise<Result<HealthStatus, DomainError>>;
 }
 
+// @implements REQ-${C}-001
 export class CheckHealthService implements GetHealthUseCase {
   private readonly contextName: string;
   private readonly clock: ClockPort;
@@ -134,7 +136,7 @@ export class CheckHealthService implements GetHealthUseCase {
 `;
 
   // Infrastructure layer: 1) branchless driver interface + raw impl, 2) mapper, 3) DI adapter
-  files["src/infrastructure/drivers/clock_driver.ts"] = `export interface RawClockDriver {
+  files["src/infrastructure/drivers/clock/clock_driver.ts"] = `export interface RawClockDriver {
   readSystemIso(): Promise<string>;
 }
 
@@ -145,9 +147,9 @@ export class SystemClockDriver implements RawClockDriver {
 }
 `;
 
-  files["src/infrastructure/repository/clock_mapper.ts"] = `import type { DomainError } from "../../domain/health.ts";
-import type { Result } from "../../domain/result.ts";
-import { err, ok } from "../../domain/result.ts";
+  files["src/infrastructure/persistence/health/clock_mapper.ts"] = `import type { DomainError } from "../../../domain/health/health.ts";
+import type { Result } from "../../../domain/shared/result.ts";
+import { err, ok } from "../../../domain/shared/result.ts";
 
 export function mapRawTimestamp(raw: string): Result<string, DomainError> {
   const trimmed = raw.trim();
@@ -158,10 +160,10 @@ export function mapRawTimestamp(raw: string): Result<string, DomainError> {
 }
 `;
 
-  files["src/infrastructure/repository/system_clock_adapter.ts"] = `import type { ClockPort, DomainError } from "../../domain/health.ts";
-import type { Result } from "../../domain/result.ts";
-import { err } from "../../domain/result.ts";
-import type { RawClockDriver } from "../drivers/clock_driver.ts";
+  files["src/infrastructure/persistence/health/system_clock_adapter.ts"] = `import type { ClockPort, DomainError } from "../../../domain/health/health.ts";
+import type { Result } from "../../../domain/shared/result.ts";
+import { err } from "../../../domain/shared/result.ts";
+import type { RawClockDriver } from "../../drivers/clock/clock_driver.ts";
 import { mapRawTimestamp } from "./clock_mapper.ts";
 
 export class SystemClockAdapter implements ClockPort {
@@ -182,19 +184,52 @@ export class SystemClockAdapter implements ClockPort {
 }
 `;
 
-  // Presentation layer (depends only on application & domain; never infrastructure)
-  files["src/presentation/web_server.ts"] = `import http from "node:http";
-import type { GetHealthUseCase } from "../application/get_health.ts";
+  // Presentation layer i18n catalogs & web handler
+  files["src/presentation/web/i18n/en.ts"] = `export interface HealthMessages {
+  readonly locale: string;
+  readonly healthyTitle: string;
+  readonly unavailableTitle: string;
+  readonly notFoundTitle: string;
+  readonly notFoundBody: string;
+}
 
-export function renderHealthHtml(title: string, bodyHtml: string): string {
+export const enMessages: HealthMessages = {
+  locale: "en",
+  healthyTitle: "Service Healthy",
+  unavailableTitle: "Service Unavailable",
+  notFoundTitle: "Not Found",
+  notFoundBody: "Page Not Found",
+};
+`;
+
+  if (locale !== "en") {
+    const isJa = locale === "ja";
+    files[`src/presentation/web/i18n/${locale}.ts`] = `import type { HealthMessages } from "./en.ts";
+
+export const userMessages: HealthMessages = {
+  locale: ${JSON.stringify(locale)},
+  healthyTitle: ${JSON.stringify(isJa ? "サービス正常" : `[${locale}] Service Healthy`)},
+  unavailableTitle: ${JSON.stringify(isJa ? "サービス利用不可" : `[${locale}] Service Unavailable`)},
+  notFoundTitle: ${JSON.stringify(isJa ? "見つかりません" : `[${locale}] Not Found`)},
+  notFoundBody: ${JSON.stringify(isJa ? "ページが見つかりません" : `[${locale}] Page Not Found`)},
+};
+`;
+  }
+
+  files["src/presentation/web/health/web_server.ts"] = `import http from "node:http";
+import type { GetHealthUseCase } from "../../../application/health/queries/get_health.ts";
+import type { HealthMessages } from "../i18n/en.ts";
+import { enMessages } from "../i18n/en.ts";
+
+export function renderHealthHtml(locale: string, title: string, bodyHtml: string): string {
   return \`<!doctype html>
-<html lang="en">
+<html lang="\${locale}">
 <head><meta charset="utf-8"><title>\${title}</title></head>
 <body>\${bodyHtml}</body>
 </html>\`;
 }
 
-export function createWebHandler(useCase: GetHealthUseCase) {
+export function createWebHandler(useCase: GetHealthUseCase, messages: HealthMessages = enMessages) {
   return async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     if (req.method === "GET" && req.url === "/") {
       const result = await useCase.execute();
@@ -202,7 +237,8 @@ export function createWebHandler(useCase: GetHealthUseCase) {
         res.writeHead(503, { "content-type": "text/html; charset=utf-8" });
         res.end(
           renderHealthHtml(
-            "Service Unavailable",
+            messages.locale,
+            messages.unavailableTitle,
             \`<main><div data-testid="error-banner">\${result.error.code}: \${result.error.message}</div></main>\`
           )
         );
@@ -211,7 +247,8 @@ export function createWebHandler(useCase: GetHealthUseCase) {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(
         renderHealthHtml(
-          "Service Healthy",
+          messages.locale,
+          messages.healthyTitle,
           \`<main><h1 data-testid="health-status">OK: \${result.value.context}</h1><p data-testid="checked-at">\${result.value.checkedAtIso}</p></main>\`
         )
       );
@@ -219,15 +256,22 @@ export function createWebHandler(useCase: GetHealthUseCase) {
     }
 
     res.writeHead(404, { "content-type": "text/html; charset=utf-8" });
-    res.end(renderHealthHtml("Not Found", '<main><p data-testid="not-found">Page Not Found</p></main>'));
+    res.end(
+      renderHealthHtml(
+        messages.locale,
+        messages.notFoundTitle,
+        \`<main><p data-testid="not-found">\${messages.notFoundBody}</p></main>\`
+      )
+    );
   };
 }
 
 export async function startPresentationServer(
   useCase: GetHealthUseCase,
-  port = 0
+  port = 0,
+  messages: HealthMessages = enMessages
 ): Promise<{ server: http.Server; baseUrl: string; close: () => Promise<void> }> {
-  const server = http.createServer(createWebHandler(useCase));
+  const server = http.createServer(createWebHandler(useCase, messages));
   await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
   const addr = server.address() as import("node:net").AddressInfo;
   return {
@@ -239,10 +283,20 @@ export async function startPresentationServer(
 `;
 
   // Composition Root (main.ts)
-  files["src/main.ts"] = `import { CheckHealthService } from "./application/get_health.ts";
-import { SystemClockDriver } from "./infrastructure/drivers/clock_driver.ts";
-import { SystemClockAdapter } from "./infrastructure/repository/system_clock_adapter.ts";
-import { startPresentationServer } from "./presentation/web_server.ts";
+  const mainCatalogImport =
+    locale !== "en"
+      ? `import { enMessages } from "./presentation/web/i18n/en.ts";\nimport { userMessages } from "./presentation/web/i18n/${locale}.ts";`
+      : `import { enMessages } from "./presentation/web/i18n/en.ts";`;
+  const mainMessagesSelect =
+    locale !== "en"
+      ? `const activeMessages = (process.env.APP_LOCALE ?? ${JSON.stringify(locale)}) === "en" ? enMessages : userMessages;`
+      : `const activeMessages = enMessages;`;
+
+  files["src/main.ts"] = `import { CheckHealthService } from "./application/health/queries/get_health.ts";
+import { SystemClockDriver } from "./infrastructure/drivers/clock/clock_driver.ts";
+import { SystemClockAdapter } from "./infrastructure/persistence/health/system_clock_adapter.ts";
+import { startPresentationServer } from "./presentation/web/health/web_server.ts";
+${mainCatalogImport}
 
 export function createApp(contextName = "${contextName}") {
   const clockDriver = new SystemClockDriver();
@@ -255,7 +309,8 @@ const isEntrypoint = process.argv[1] && import.meta.url === new URL(\`file://\${
 if (isEntrypoint) {
   const port = Number(process.env.PORT ?? "3000");
   const { useCase } = createApp();
-  const { baseUrl } = await startPresentationServer(useCase, port);
+  ${mainMessagesSelect}
+  const { baseUrl } = await startPresentationServer(useCase, port, activeMessages);
   console.log(\`LISTENING \${baseUrl}\`);
 }
 `;
@@ -507,42 +562,60 @@ console.log(\`PASS: 100% C1 branch coverage verified across \${srcFiles.length} 
 
   // Tests
   files["tests/unit/domain_application.test.mjs"] = `import assert from "node:assert/strict";
-import { createHealthStatus } from "../../src/domain/health.ts";
-import { CheckHealthService } from "../../src/application/get_health.ts";
-import { err, ok } from "../../src/domain/result.ts";
+import { createHealthStatus } from "../../src/domain/health/health.ts";
+import { CheckHealthService } from "../../src/application/health/queries/get_health.ts";
+import { err, ok } from "../../src/domain/shared/result.ts";
 
-export async function run() {
+const cases = [];
+function test(name, fn) { cases.push({ name, fn }); }
+
+test("UT-${C}-001 valid health status", async () => {
   const valid = createHealthStatus("${contextName}", " 2026-11-22T00:00:00Z ");
   assert.equal(valid.ok, true);
   assert.equal(valid.value.checkedAtIso, "2026-11-22T00:00:00Z");
+});
 
+test("UT-${C}-002 empty timestamp rejected", async () => {
   const empty = createHealthStatus("${contextName}", "   ");
   assert.equal(empty.ok, false);
   assert.equal(empty.error.code, "INVALID_TIMESTAMP");
+});
 
+test("UT-${C}-005 CheckHealthService returns Ok", async () => {
   const serviceOk = new CheckHealthService("${contextName}", {
     async currentIso() { return ok("2026-11-22T00:00:00Z"); },
   });
   const appOk = await serviceOk.execute();
   assert.equal(appOk.ok, true);
+});
 
+test("UT-${C}-006 CheckHealthService propagates Err", async () => {
   const serviceErr = new CheckHealthService("${contextName}", {
     async currentIso() { return err({ code: "CLOCK_UNAVAILABLE", message: "down" }); },
   });
   const appErr = await serviceErr.execute();
   assert.equal(appErr.ok, false);
   assert.equal(appErr.error.code, "CLOCK_UNAVAILABLE");
+});
+
+export async function run() {
+  for (const c of cases) await c.fn();
 }
 `;
 
   files["tests/unit/infrastructure.test.mjs"] = `import assert from "node:assert/strict";
-import { mapRawTimestamp } from "../../src/infrastructure/repository/clock_mapper.ts";
-import { SystemClockAdapter } from "../../src/infrastructure/repository/system_clock_adapter.ts";
+import { mapRawTimestamp } from "../../src/infrastructure/persistence/health/clock_mapper.ts";
+import { SystemClockAdapter } from "../../src/infrastructure/persistence/health/system_clock_adapter.ts";
 
-export async function run() {
+const cases = [];
+function test(name, fn) { cases.push({ name, fn }); }
+
+test("UT-${C}-003 mapRawTimestamp handles valid and blank", async () => {
   assert.equal(mapRawTimestamp(" 2026-11-22T00:00:00Z ").ok, true);
   assert.equal(mapRawTimestamp(" ").ok, false);
+});
 
+test("UT-${C}-004 SystemClockAdapter handles ok and driver failure", async () => {
   const okAdapter = new SystemClockAdapter({ async readSystemIso() { return "2026-11-22T00:00:00Z"; } });
   assert.equal((await okAdapter.currentIso()).ok, true);
 
@@ -550,15 +623,37 @@ export async function run() {
   const failRes = await failAdapter.currentIso();
   assert.equal(failRes.ok, false);
   assert.equal(failRes.error.code, "CLOCK_UNAVAILABLE");
+});
+
+export async function run() {
+  for (const c of cases) await c.fn();
 }
 `;
 
+  const presLocaleCheck =
+    locale !== "en"
+      ? `  nextResult = ok({ context: "${contextName}", checkedAtIso: "2026-11-22T00:00:00Z" });
+  const { userMessages } = await import("../../src/presentation/web/i18n/${locale}.ts");
+  const srvUser = await startPresentationServer(mockUseCase, 0, userMessages);
+  const bUser = await launchHeadlessBrowser();
+  try {
+    await bUser.goto(\`\${srvUser.baseUrl}/\`);
+    assert.equal(await bUser.title(), userMessages.healthyTitle);
+  } finally {
+    await bUser.close();
+    await srvUser.close();
+  }`
+      : "";
+
   files["tests/unit/presentation.browser.test.mjs"] = `import assert from "node:assert/strict";
-import { err, ok } from "../../src/domain/result.ts";
-import { startPresentationServer } from "../../src/presentation/web_server.ts";
+import { err, ok } from "../../src/domain/shared/result.ts";
+import { startPresentationServer } from "../../src/presentation/web/health/web_server.ts";
 import { launchHeadlessBrowser } from "../../scripts/browser-helper.mjs";
 
-export async function run() {
+const cases = [];
+function test(name, fn) { cases.push({ name, fn }); }
+
+test("UT-${C}-007 presentation renders healthy, error, 404, and localized views", async () => {
   let nextResult = ok({ context: "${contextName}", checkedAtIso: "2026-11-22T00:00:00Z" });
   const mockUseCase = {
     async execute() {
@@ -584,6 +679,11 @@ export async function run() {
     await browser.close();
     await close();
   }
+${presLocaleCheck}
+});
+
+export async function run() {
+  for (const c of cases) await c.fn();
 }
 `;
 
@@ -603,6 +703,7 @@ CMD ["node", "--experimental-strip-types", "src/main.ts"]
 `;
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 if ! docker info >/dev/null 2>&1; then
   echo "ERROR: Docker daemon is not running; cannot execute Docker integration test." >&2
   exit 1
@@ -616,6 +717,7 @@ echo "PASS: Docker container integration test verified drivers/ and main.ts"
   } else if (dist === "binary") {
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 node --experimental-strip-types -e '
 import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
@@ -647,6 +749,7 @@ try {
   } else {
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 node --experimental-strip-types -e '
 import assert from "node:assert/strict";
 import { createApp } from "./src/main.ts";

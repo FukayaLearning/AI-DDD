@@ -1,4 +1,5 @@
-export function generateGoSkeleton({ projectName, contextName, dist, cliPath }) {
+export function generateGoSkeleton({ projectName, contextName, contextCode = "CTX", locale = "en", dist, cliPath }) {
+  const C = contextCode;
   const moduleName = `example.com/${projectName.toLowerCase().replace(/[^a-z0-9-]+/g, "-")}`;
   const files = {};
 
@@ -7,7 +8,7 @@ export function generateGoSkeleton({ projectName, contextName, dist, cliPath }) 
 go 1.23
 `;
 
-  files["internal/domain/result.go"] = `package domain
+  files["internal/domain/shared/result.go"] = `package shared
 
 type Result[T any, E any] struct {
 	Ok    bool
@@ -24,9 +25,12 @@ func Failure[T any, E any](err E) Result[T, E] {
 }
 `;
 
-  files["internal/domain/health.go"] = `package domain
+  files["internal/domain/health/health.go"] = `package health
 
-import "strings"
+import (
+	"strings"
+	"${moduleName}/internal/domain/shared"
+)
 
 type DomainError struct {
 	Code    string
@@ -39,51 +43,55 @@ type HealthStatus struct {
 }
 
 type ClockPort interface {
-	CurrentIso() Result[string, DomainError]
+	CurrentIso() shared.Result[string, DomainError]
 }
 
-func CreateHealthStatus(context string, checkedAtIso string) Result[HealthStatus, DomainError] {
+func CreateHealthStatus(context string, checkedAtIso string) shared.Result[HealthStatus, DomainError] {
 	trimmed := strings.TrimSpace(checkedAtIso)
 	if trimmed == "" {
-		return Failure[HealthStatus, DomainError](DomainError{
+		return shared.Failure[HealthStatus, DomainError](DomainError{
 			Code:    "INVALID_TIMESTAMP",
 			Message: "Timestamp must not be empty",
 		})
 	}
-	return Success[HealthStatus, DomainError](HealthStatus{
+	return shared.Success[HealthStatus, DomainError](HealthStatus{
 		Context:      context,
 		CheckedAtIso: trimmed,
 	})
 }
 `;
 
-  files["internal/application/get_health.go"] = `package application
+  files["internal/application/health/queries/get_health.go"] = `package queries
 
-import "${moduleName}/internal/domain"
+import (
+	"${moduleName}/internal/domain/health"
+	"${moduleName}/internal/domain/shared"
+)
 
 type GetHealthUseCase interface {
-	Execute() domain.Result[domain.HealthStatus, domain.DomainError]
+	Execute() shared.Result[health.HealthStatus, health.DomainError]
 }
 
+// @implements REQ-${C}-001
 type CheckHealthService struct {
 	contextName string
-	clock       domain.ClockPort
+	clock       health.ClockPort
 }
 
-func NewCheckHealthService(contextName string, clock domain.ClockPort) *CheckHealthService {
+func NewCheckHealthService(contextName string, clock health.ClockPort) *CheckHealthService {
 	return &CheckHealthService{contextName: contextName, clock: clock}
 }
 
-func (s *CheckHealthService) Execute() domain.Result[domain.HealthStatus, domain.DomainError] {
+func (s *CheckHealthService) Execute() shared.Result[health.HealthStatus, health.DomainError] {
 	now := s.clock.CurrentIso()
 	if !now.Ok {
-		return domain.Failure[domain.HealthStatus, domain.DomainError](*now.Error)
+		return shared.Failure[health.HealthStatus, health.DomainError](*now.Error)
 	}
-	return domain.CreateHealthStatus(s.contextName, now.Value)
+	return health.CreateHealthStatus(s.contextName, now.Value)
 }
 `;
 
-  files["internal/infrastructure/drivers/clock_driver.go"] = `package drivers
+  files["internal/infrastructure/drivers/clock/clock_driver.go"] = `package clock
 
 import "time"
 
@@ -98,44 +106,46 @@ func (SystemClockDriver) ReadSystemIso() (string, error) {
 }
 `;
 
-  files["internal/infrastructure/repository/clock_mapper.go"] = `package repository
+  files["internal/infrastructure/persistence/health/clock_mapper.go"] = `package health
 
 import (
 	"strings"
-	"${moduleName}/internal/domain"
+	domain "${moduleName}/internal/domain/health"
+	"${moduleName}/internal/domain/shared"
 )
 
-func MapRawTimestamp(raw string) domain.Result[string, domain.DomainError] {
+func MapRawTimestamp(raw string) shared.Result[string, domain.DomainError] {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return domain.Failure[string, domain.DomainError](domain.DomainError{
+		return shared.Failure[string, domain.DomainError](domain.DomainError{
 			Code:    "CLOCK_UNAVAILABLE",
 			Message: "Clock returned empty timestamp",
 		})
 	}
-	return domain.Success[string, domain.DomainError](trimmed)
+	return shared.Success[string, domain.DomainError](trimmed)
 }
 `;
 
-  files["internal/infrastructure/repository/system_clock_adapter.go"] = `package repository
+  files["internal/infrastructure/persistence/health/system_clock_adapter.go"] = `package health
 
 import (
-	"${moduleName}/internal/domain"
-	"${moduleName}/internal/infrastructure/drivers"
+	domain "${moduleName}/internal/domain/health"
+	"${moduleName}/internal/domain/shared"
+	"${moduleName}/internal/infrastructure/drivers/clock"
 )
 
 type SystemClockAdapter struct {
-	driver drivers.RawClockDriver
+	driver clock.RawClockDriver
 }
 
-func NewSystemClockAdapter(driver drivers.RawClockDriver) *SystemClockAdapter {
+func NewSystemClockAdapter(driver clock.RawClockDriver) *SystemClockAdapter {
 	return &SystemClockAdapter{driver: driver}
 }
 
-func (a *SystemClockAdapter) CurrentIso() domain.Result[string, domain.DomainError] {
+func (a *SystemClockAdapter) CurrentIso() shared.Result[string, domain.DomainError] {
 	raw, err := a.driver.ReadSystemIso()
 	if err != nil {
-		return domain.Failure[string, domain.DomainError](domain.DomainError{
+		return shared.Failure[string, domain.DomainError](domain.DomainError{
 			Code:    "CLOCK_UNAVAILABLE",
 			Message: "Failed to read system clock",
 		})
@@ -144,39 +154,81 @@ func (a *SystemClockAdapter) CurrentIso() domain.Result[string, domain.DomainErr
 }
 `;
 
-  files["internal/presentation/web_server.go"] = `package presentation
+  files["internal/presentation/web/i18n/en.go"] = `package i18n
+
+type HealthMessages struct {
+	Locale           string
+	HealthyTitle     string
+	UnavailableTitle string
+	NotFoundTitle    string
+	NotFoundBody     string
+}
+
+var EnMessages = HealthMessages{
+	Locale:           "en",
+	HealthyTitle:     "Service Healthy",
+	UnavailableTitle: "Service Unavailable",
+	NotFoundTitle:    "Not Found",
+	NotFoundBody:     "Page Not Found",
+}
+`;
+
+  if (locale !== "en") {
+    const isJa = locale === "ja";
+    files[`internal/presentation/web/i18n/${locale}.go`] = `package i18n
+
+var UserMessages = HealthMessages{
+	Locale:           ${JSON.stringify(locale)},
+	HealthyTitle:     ${JSON.stringify(isJa ? "サービス正常" : `[${locale}] Service Healthy`)},
+	UnavailableTitle: ${JSON.stringify(isJa ? "サービス利用不可" : `[${locale}] Service Unavailable`)},
+	NotFoundTitle:    ${JSON.stringify(isJa ? "見つかりません" : `[${locale}] Not Found`)},
+	NotFoundBody:     ${JSON.stringify(isJa ? "ページが見つかりません" : `[${locale}] Page Not Found`)},
+}
+`;
+  }
+
+  files["internal/presentation/web/health/web_server.go"] = `package health
 
 import (
 	"fmt"
 	"html"
 	"net/http"
-	"${moduleName}/internal/application"
+	"${moduleName}/internal/application/health/queries"
+	"${moduleName}/internal/presentation/web/i18n"
 )
 
-func RenderHealthHTML(title string, body string) string {
-	return fmt.Sprintf("<!doctype html><html lang='en'><head><meta charset='utf-8'><title>%s</title></head><body>%s</body></html>", html.EscapeString(title), body)
+func RenderHealthHTML(locale string, title string, body string) string {
+	return fmt.Sprintf("<!doctype html><html lang='%s'><head><meta charset='utf-8'><title>%s</title></head><body>%s</body></html>", html.EscapeString(locale), html.EscapeString(title), body)
 }
 
-func NewWebHandler(useCase application.GetHealthUseCase) http.Handler {
+func NewWebHandler(useCase queries.GetHealthUseCase, msg i18n.HealthMessages) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/" {
 			res := useCase.Execute()
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			if !res.Ok {
 				w.WriteHeader(http.StatusServiceUnavailable)
-				_, _ = w.Write([]byte(RenderHealthHTML("Service Unavailable", fmt.Sprintf("<main><div data-testid='error-banner'>%s: %s</div></main>", html.EscapeString(res.Error.Code), html.EscapeString(res.Error.Message)))))
+				_, _ = w.Write([]byte(RenderHealthHTML(msg.Locale, msg.UnavailableTitle, fmt.Sprintf("<main><div data-testid='error-banner'>%s: %s</div></main>", html.EscapeString(res.Error.Code), html.EscapeString(res.Error.Message)))))
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(RenderHealthHTML("Service Healthy", fmt.Sprintf("<main><h1 data-testid='health-status'>OK: %s</h1><p data-testid='checked-at'>%s</p></main>", html.EscapeString(res.Value.Context), html.EscapeString(res.Value.CheckedAtIso)))))
+			_, _ = w.Write([]byte(RenderHealthHTML(msg.Locale, msg.HealthyTitle, fmt.Sprintf("<main><h1 data-testid='health-status'>OK: %s</h1><p data-testid='checked-at'>%s</p></main>", html.EscapeString(res.Value.Context), html.EscapeString(res.Value.CheckedAtIso)))))
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(RenderHealthHTML("Not Found", "<main><p data-testid='not-found'>Page Not Found</p></main>")))
+		_, _ = w.Write([]byte(RenderHealthHTML(msg.Locale, msg.NotFoundTitle, fmt.Sprintf("<main><p data-testid='not-found'>%s</p></main>", html.EscapeString(msg.NotFoundBody)))))
 	})
 }
 `;
+
+  const goMainMsg =
+    locale !== "en"
+      ? `	msg := i18n.UserMessages
+	if os.Getenv("APP_LOCALE") == "en" {
+		msg = i18n.EnMessages
+	}`
+      : `	msg := i18n.EnMessages`;
 
   files["cmd/server/main.go"] = `package main
 
@@ -185,16 +237,17 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"${moduleName}/internal/application"
-	"${moduleName}/internal/infrastructure/drivers"
-	"${moduleName}/internal/infrastructure/repository"
-	"${moduleName}/internal/presentation"
+	"${moduleName}/internal/application/health/queries"
+	"${moduleName}/internal/infrastructure/drivers/clock"
+	persistence "${moduleName}/internal/infrastructure/persistence/health"
+	"${moduleName}/internal/presentation/web/health"
+	"${moduleName}/internal/presentation/web/i18n"
 )
 
-func CreateApp(contextName string) application.GetHealthUseCase {
-	drv := drivers.SystemClockDriver{}
-	adapter := repository.NewSystemClockAdapter(drv)
-	return application.NewCheckHealthService(contextName, adapter)
+func CreateApp(contextName string) queries.GetHealthUseCase {
+	drv := clock.SystemClockDriver{}
+	adapter := persistence.NewSystemClockAdapter(drv)
+	return queries.NewCheckHealthService(contextName, adapter)
 }
 
 func main() {
@@ -207,59 +260,63 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("LISTENING http://%s\\n", ln.Addr().String())
-	_ = http.Serve(ln, presentation.NewWebHandler(CreateApp("${contextName}")))
+${goMainMsg}
+	_ = http.Serve(ln, health.NewWebHandler(CreateApp("${contextName}"), msg))
 }
 `;
 
-  files["internal/domain/health_test.go"] = `package domain_test
+  files["internal/domain/health/health_test.go"] = `package health_test
 
 import (
 	"testing"
-	"${moduleName}/internal/domain"
+	"${moduleName}/internal/domain/health"
 )
 
-func TestCreateHealthStatus(t *testing.T) {
-	okRes := domain.CreateHealthStatus("${contextName}", " 2026-11-22T00:00:00Z ")
+// UT-${C}-001, UT-${C}-002
+func TestUT_${C}_001_CreateHealthStatus(t *testing.T) {
+	okRes := health.CreateHealthStatus("${contextName}", " 2026-11-22T00:00:00Z ")
 	if !okRes.Ok || okRes.Value.CheckedAtIso != "2026-11-22T00:00:00Z" {
 		t.Fatalf("expected Ok, got %+v", okRes)
 	}
-	errRes := domain.CreateHealthStatus("${contextName}", " ")
+	errRes := health.CreateHealthStatus("${contextName}", " ")
 	if errRes.Ok || errRes.Error.Code != "INVALID_TIMESTAMP" {
 		t.Fatalf("expected INVALID_TIMESTAMP, got %+v", errRes)
 	}
 }
 `;
 
-  files["internal/application/get_health_test.go"] = `package application_test
+  files["internal/application/health/queries/get_health_test.go"] = `package queries_test
 
 import (
 	"testing"
-	"${moduleName}/internal/application"
-	"${moduleName}/internal/domain"
+	"${moduleName}/internal/application/health/queries"
+	"${moduleName}/internal/domain/health"
+	"${moduleName}/internal/domain/shared"
 )
 
-type stubClockPort struct{ res domain.Result[string, domain.DomainError] }
+type stubClockPort struct{ res shared.Result[string, health.DomainError] }
 
-func (s stubClockPort) CurrentIso() domain.Result[string, domain.DomainError] { return s.res }
+func (s stubClockPort) CurrentIso() shared.Result[string, health.DomainError] { return s.res }
 
-func TestCheckHealthService(t *testing.T) {
-	svcOk := application.NewCheckHealthService("${contextName}", stubClockPort{res: domain.Success[string, domain.DomainError]("2026-11-22T00:00:00Z")})
+// UT-${C}-005, UT-${C}-006
+func TestUT_${C}_005_CheckHealthService(t *testing.T) {
+	svcOk := queries.NewCheckHealthService("${contextName}", stubClockPort{res: shared.Success[string, health.DomainError]("2026-11-22T00:00:00Z")})
 	if res := svcOk.Execute(); !res.Ok {
 		t.Fatalf("expected Ok")
 	}
-	svcErr := application.NewCheckHealthService("${contextName}", stubClockPort{res: domain.Failure[string, domain.DomainError](domain.DomainError{Code: "CLOCK_UNAVAILABLE", Message: "down"})})
+	svcErr := queries.NewCheckHealthService("${contextName}", stubClockPort{res: shared.Failure[string, health.DomainError](health.DomainError{Code: "CLOCK_UNAVAILABLE", Message: "down"})})
 	if res := svcErr.Execute(); res.Ok || res.Error.Code != "CLOCK_UNAVAILABLE" {
 		t.Fatalf("expected Err")
 	}
 }
 `;
 
-  files["internal/infrastructure/repository/system_clock_adapter_test.go"] = `package repository_test
+  files["internal/infrastructure/persistence/health/system_clock_adapter_test.go"] = `package health_test
 
 import (
 	"errors"
 	"testing"
-	"${moduleName}/internal/infrastructure/repository"
+	persistence "${moduleName}/internal/infrastructure/persistence/health"
 )
 
 type mockDriver struct {
@@ -269,57 +326,61 @@ type mockDriver struct {
 
 func (m mockDriver) ReadSystemIso() (string, error) { return m.iso, m.err }
 
-func TestSystemClockAdapter(t *testing.T) {
-	if res := repository.MapRawTimestamp("2026-11-22T00:00:00Z"); !res.Ok {
+// UT-${C}-003, UT-${C}-004
+func TestUT_${C}_003_SystemClockAdapter(t *testing.T) {
+	if res := persistence.MapRawTimestamp("2026-11-22T00:00:00Z"); !res.Ok {
 		t.Fatalf("expected Ok")
 	}
-	if res := repository.MapRawTimestamp(" "); res.Ok {
+	if res := persistence.MapRawTimestamp(" "); res.Ok {
 		t.Fatalf("expected Err")
 	}
-	if res := repository.NewSystemClockAdapter(mockDriver{iso: "2026-11-22T00:00:00Z"}).CurrentIso(); !res.Ok {
+	if res := persistence.NewSystemClockAdapter(mockDriver{iso: "2026-11-22T00:00:00Z"}).CurrentIso(); !res.Ok {
 		t.Fatalf("expected Ok")
 	}
-	if res := repository.NewSystemClockAdapter(mockDriver{err: errors.New("io")}).CurrentIso(); res.Ok {
+	if res := persistence.NewSystemClockAdapter(mockDriver{err: errors.New("io")}).CurrentIso(); res.Ok {
 		t.Fatalf("expected Err")
 	}
 }
 `;
 
-  files["internal/presentation/web_server_test.go"] = `package presentation_test
+  files["internal/presentation/web/health/web_server_test.go"] = `package health_test
 
 import (
 	"encoding/json"
 	"net/http/httptest"
 	"os/exec"
 	"testing"
-	"${moduleName}/internal/domain"
-	"${moduleName}/internal/presentation"
+	domain "${moduleName}/internal/domain/health"
+	"${moduleName}/internal/domain/shared"
+	"${moduleName}/internal/presentation/web/health"
+	"${moduleName}/internal/presentation/web/i18n"
 )
 
 type mockUseCase struct {
-	res domain.Result[domain.HealthStatus, domain.DomainError]
+	res shared.Result[domain.HealthStatus, domain.DomainError]
 }
 
-func (m *mockUseCase) Execute() domain.Result[domain.HealthStatus, domain.DomainError] { return m.res }
+func (m *mockUseCase) Execute() shared.Result[domain.HealthStatus, domain.DomainError] { return m.res }
 
-func TestPresentationWebUIWithBrowser(t *testing.T) {
-	uc := &mockUseCase{res: domain.Success[domain.HealthStatus, domain.DomainError](domain.HealthStatus{Context: "${contextName}", CheckedAtIso: "2026-11-22T00:00:00Z"})}
-	srv := httptest.NewServer(presentation.NewWebHandler(uc))
+// UT-${C}-007
+func TestUT_${C}_007_PresentationWebUIWithBrowser(t *testing.T) {
+	uc := &mockUseCase{res: shared.Success[domain.HealthStatus, domain.DomainError](domain.HealthStatus{Context: "${contextName}", CheckedAtIso: "2026-11-22T00:00:00Z"})}
+	srv := httptest.NewServer(health.NewWebHandler(uc, i18n.EnMessages))
 	defer srv.Close()
 
 	scenarios, _ := json.Marshal([]map[string]string{
 		{"url": srv.URL + "/", "selector": "[data-testid='health-status']", "expected": "OK: ${contextName}"},
 	})
-	if out, err := exec.Command("node", "../../scripts/browser_driver.mjs", string(scenarios)).CombinedOutput(); err != nil {
+	if out, err := exec.Command("node", "../../../../scripts/browser_driver.mjs", string(scenarios)).CombinedOutput(); err != nil {
 		t.Fatalf("browser test failed: %v %s", err, string(out))
 	}
 
-	uc.res = domain.Failure[domain.HealthStatus, domain.DomainError](domain.DomainError{Code: "CLOCK_UNAVAILABLE", Message: "mock outage"})
+	uc.res = shared.Failure[domain.HealthStatus, domain.DomainError](domain.DomainError{Code: "CLOCK_UNAVAILABLE", Message: "mock outage"})
 	scenariosErr, _ := json.Marshal([]map[string]string{
 		{"url": srv.URL + "/", "selector": "[data-testid='error-banner']", "expected": "CLOCK_UNAVAILABLE: mock outage"},
 		{"url": srv.URL + "/missing", "selector": "[data-testid='not-found']", "expected": "Page Not Found"},
 	})
-	if out, err := exec.Command("node", "../../scripts/browser_driver.mjs", string(scenariosErr)).CombinedOutput(); err != nil {
+	if out, err := exec.Command("node", "../../../../scripts/browser_driver.mjs", string(scenariosErr)).CombinedOutput(); err != nil {
 		t.Fatalf("browser error test failed: %v %s", err, string(out))
 	}
 }
@@ -447,7 +508,7 @@ if ! command -v go >/dev/null 2>&1; then
   echo "ERROR: 'go' toolchain not found in PATH." >&2
   exit 1
 fi
-go test -v -covermode=atomic -coverprofile=coverage.out ./internal/domain/... ./internal/application/... ./internal/infrastructure/repository/... ./internal/presentation/...
+go test -v -covermode=atomic -coverprofile=coverage.out ./internal/domain/... ./internal/application/... ./internal/infrastructure/persistence/... ./internal/presentation/...
 go tool cover -func=coverage.out
 total=$(go tool cover -func=coverage.out | awk '/^total:/ {print $3}')
 if [ "$total" != "100.0%" ]; then
@@ -476,6 +537,7 @@ CMD ["/app/server"]
 `;
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 if ! docker info >/dev/null 2>&1; then
   echo "ERROR: Docker daemon is not running; cannot execute Docker integration test." >&2
   exit 1
@@ -488,6 +550,7 @@ curl -fsS http://127.0.0.1:13002/ | grep -q "OK: ${contextName}"
   } else if (dist === "binary") {
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 go build -o /tmp/ai-ddd-go-server ./cmd/server
 PORT=0 /tmp/ai-ddd-go-server > /tmp/ai-ddd-go.log 2>&1 &
 PID=$!
@@ -500,6 +563,7 @@ echo "PASS: Go binary integration test verified drivers/ and cmd/server/main.go"
   } else {
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 go build ./cmd/server
 echo "PASS: Go library package compilation and wiring verified"
 `;

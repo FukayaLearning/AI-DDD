@@ -1,4 +1,5 @@
-export function generateRustSkeleton({ projectName, contextName, dist, cliPath }) {
+export function generateRustSkeleton({ projectName, contextName, contextCode = "CTX", locale = "en", dist, cliPath }) {
+  const C = contextCode;
   const crateName = projectName.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
   const files = {};
 
@@ -9,17 +10,20 @@ edition = "2021"
 `;
 
   files["src/domain/mod.rs"] = `pub mod health;
-pub mod result;
+pub mod shared;
 `;
-
-  files["src/domain/result.rs"] = `#[derive(Debug, Clone, PartialEq, Eq)]
+  files["src/domain/shared/mod.rs"] = `pub mod result;
+`;
+  files["src/domain/shared/result.rs"] = `#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainResult<T, E> {
     Ok(T),
     Err(E),
 }
 `;
 
-  files["src/domain/health.rs"] = `use crate::domain::result::DomainResult;
+  files["src/domain/health/mod.rs"] = `pub mod health;
+`;
+  files["src/domain/health/health.rs"] = `use crate::domain::shared::result::DomainResult;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DomainError {
@@ -52,16 +56,20 @@ pub fn create_health_status(context: &str, checked_at_iso: &str) -> DomainResult
 }
 `;
 
-  files["src/application/mod.rs"] = `pub mod get_health;
+  files["src/application/mod.rs"] = `pub mod health;
 `;
-
-  files["src/application/get_health.rs"] = `use crate::domain::health::{create_health_status, ClockPort, DomainError, HealthStatus};
-use crate::domain::result::DomainResult;
+  files["src/application/health/mod.rs"] = `pub mod queries;
+`;
+  files["src/application/health/queries/mod.rs"] = `pub mod get_health;
+`;
+  files["src/application/health/queries/get_health.rs"] = `use crate::domain::health::health::{create_health_status, ClockPort, DomainError, HealthStatus};
+use crate::domain::shared::result::DomainResult;
 
 pub trait GetHealthUseCase {
     fn execute(&self) -> DomainResult<HealthStatus, DomainError>;
 }
 
+// @implements REQ-${C}-001
 pub struct CheckHealthService<C: ClockPort> {
     context_name: String,
     clock: C,
@@ -87,13 +95,14 @@ impl<C: ClockPort> GetHealthUseCase for CheckHealthService<C> {
 `;
 
   files["src/infrastructure/mod.rs"] = `pub mod drivers;
-pub mod repository;
+pub mod persistence;
 `;
 
-  files["src/infrastructure/drivers/mod.rs"] = `pub mod clock_driver;
+  files["src/infrastructure/drivers/mod.rs"] = `pub mod clock;
 `;
-
-  files["src/infrastructure/drivers/clock_driver.rs"] = `use std::time::{SystemTime, UNIX_EPOCH};
+  files["src/infrastructure/drivers/clock/mod.rs"] = `pub mod clock_driver;
+`;
+  files["src/infrastructure/drivers/clock/clock_driver.rs"] = `use std::time::{SystemTime, UNIX_EPOCH};
 
 pub trait RawClockDriver {
     fn read_system_epoch(&self) -> Result<u64, String>;
@@ -111,12 +120,13 @@ impl RawClockDriver for SystemClockDriver {
 }
 `;
 
-  files["src/infrastructure/repository/mod.rs"] = `pub mod clock_mapper;
+  files["src/infrastructure/persistence/mod.rs"] = `pub mod health;
+`;
+  files["src/infrastructure/persistence/health/mod.rs"] = `pub mod clock_mapper;
 pub mod system_clock_adapter;
 `;
-
-  files["src/infrastructure/repository/clock_mapper.rs"] = `use crate::domain::health::DomainError;
-use crate::domain::result::DomainResult;
+  files["src/infrastructure/persistence/health/clock_mapper.rs"] = `use crate::domain::health::health::DomainError;
+use crate::domain::shared::result::DomainResult;
 
 pub fn map_epoch_seconds(epoch_secs: u64) -> DomainResult<String, DomainError> {
     if epoch_secs == 0 {
@@ -129,10 +139,10 @@ pub fn map_epoch_seconds(epoch_secs: u64) -> DomainResult<String, DomainError> {
 }
 `;
 
-  files["src/infrastructure/repository/system_clock_adapter.rs"] = `use crate::domain::health::{ClockPort, DomainError};
-use crate::domain::result::DomainResult;
-use crate::infrastructure::drivers::clock_driver::RawClockDriver;
-use crate::infrastructure::repository::clock_mapper::map_epoch_seconds;
+  files["src/infrastructure/persistence/health/system_clock_adapter.rs"] = `use crate::domain::health::health::{ClockPort, DomainError};
+use crate::domain::shared::result::DomainResult;
+use crate::infrastructure::drivers::clock::clock_driver::RawClockDriver;
+use crate::infrastructure::persistence::health::clock_mapper::map_epoch_seconds;
 
 pub struct SystemClockAdapter<D: RawClockDriver> {
     driver: D,
@@ -157,22 +167,60 @@ impl<D: RawClockDriver> ClockPort for SystemClockAdapter<D> {
 }
 `;
 
-  files["src/presentation/mod.rs"] = `pub mod web_server;
+  files["src/presentation/mod.rs"] = `pub mod web;
+`;
+  files["src/presentation/web/mod.rs"] = `pub mod health;
+pub mod i18n;
+`;
+  files["src/presentation/web/i18n/mod.rs"] = locale !== "en" ? `pub mod en;\npub mod user;\n` : `pub mod en;\n`;
+  files["src/presentation/web/i18n/en.rs"] = `pub struct HealthMessages {
+    pub locale: &'static str,
+    pub healthy_title: &'static str,
+    pub unavailable_title: &'static str,
+    pub not_found_title: &'static str,
+    pub not_found_body: &'static str,
+}
+
+pub const EN_MESSAGES: HealthMessages = HealthMessages {
+    locale: "en",
+    healthy_title: "Service Healthy",
+    unavailable_title: "Service Unavailable",
+    not_found_title: "Not Found",
+    not_found_body: "Page Not Found",
+};
 `;
 
-  files["src/presentation/web_server.rs"] = `use crate::application::get_health::GetHealthUseCase;
-use crate::domain::result::DomainResult;
+  if (locale !== "en") {
+    const isJa = locale === "ja";
+    files[`src/presentation/web/i18n/${locale}.rs`] = `use super::en::HealthMessages;
+
+pub const USER_MESSAGES: HealthMessages = HealthMessages {
+    locale: ${JSON.stringify(locale)},
+    healthy_title: ${JSON.stringify(isJa ? "サービス正常" : `[${locale}] Service Healthy`)},
+    unavailable_title: ${JSON.stringify(isJa ? "サービス利用不可" : `[${locale}] Service Unavailable`)},
+    not_found_title: ${JSON.stringify(isJa ? "見つかりません" : `[${locale}] Not Found`)},
+    not_found_body: ${JSON.stringify(isJa ? "ページが見つかりません" : `[${locale}] Page Not Found`)},
+};
+`;
+    files["src/presentation/web/i18n/mod.rs"] = `pub mod en;\n#[path = "${locale}.rs"]\npub mod user;\n`;
+  }
+
+  files["src/presentation/web/health/mod.rs"] = `pub mod web_server;
+`;
+  files["src/presentation/web/health/web_server.rs"] = `use crate::application::health::queries::get_health::GetHealthUseCase;
+use crate::domain::shared::result::DomainResult;
+use crate::presentation::web::i18n::en::{HealthMessages, EN_MESSAGES};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 
-pub fn render_html(title: &str, body: &str) -> String {
+pub fn render_html(locale: &str, title: &str, body: &str) -> String {
     format!(
-        "<!doctype html><html lang='en'><head><meta charset='utf-8'><title>{}</title></head><body>{}</body></html>",
-        title, body
+        "<!doctype html><html lang='{}'><head><meta charset='utf-8'><title>{}</title></head><body>{}</body></html>",
+        locale, title, body
     )
 }
 
-pub fn handle_http_request<U: GetHealthUseCase>(use_case: &U, request_line: &str) -> (u16, String) {
+pub fn handle_http_request<U: GetHealthUseCase>(use_case: &U, request_line: &str, messages: &HealthMessages) -> (u16, String) {
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("");
     let path = parts.next().unwrap_or("");
@@ -181,14 +229,16 @@ pub fn handle_http_request<U: GetHealthUseCase>(use_case: &U, request_line: &str
             DomainResult::Err(e) => (
                 503,
                 render_html(
-                    "Service Unavailable",
+                    messages.locale,
+                    messages.unavailable_title,
                     &format!("<main><div data-testid='error-banner'>{}: {}</div></main>", e.code, e.message),
                 ),
             ),
             DomainResult::Ok(status) => (
                 200,
                 render_html(
-                    "Service Healthy",
+                    messages.locale,
+                    messages.healthy_title,
                     &format!(
                         "<main><h1 data-testid='health-status'>OK: {}</h1><p data-testid='checked-at'>{}</p></main>",
                         status.context, status.checked_at_iso
@@ -199,7 +249,11 @@ pub fn handle_http_request<U: GetHealthUseCase>(use_case: &U, request_line: &str
     }
     (
         404,
-        render_html("Not Found", "<main><p data-testid='not-found'>Page Not Found</p></main>"),
+        render_html(
+            messages.locale,
+            messages.not_found_title,
+            &format!("<main><p data-testid='not-found'>{}</p></main>", messages.not_found_body),
+        ),
     )
 }
 
@@ -208,7 +262,7 @@ pub fn serve_single_connection<U: GetHealthUseCase>(mut stream: TcpStream, use_c
     let n = stream.read(&mut buf).unwrap_or(0);
     let req_str = String::from_utf8_lossy(&buf[..n]);
     let first_line = req_str.lines().next().unwrap_or("");
-    let (status_code, html) = handle_http_request(use_case, first_line);
+    let (status_code, html) = handle_http_request(use_case, first_line, &EN_MESSAGES);
     let status_text = match status_code {
         200 => "OK",
         503 => "Service Unavailable",
@@ -231,10 +285,10 @@ pub mod infrastructure;
 pub mod presentation;
 `;
 
-  files["src/main.rs"] = `use ${crateName}::application::get_health::CheckHealthService;
-use ${crateName}::infrastructure::drivers::clock_driver::SystemClockDriver;
-use ${crateName}::infrastructure::repository::system_clock_adapter::SystemClockAdapter;
-use ${crateName}::presentation::web_server::serve_single_connection;
+  files["src/main.rs"] = `use ${crateName}::application::health::queries::get_health::CheckHealthService;
+use ${crateName}::infrastructure::drivers::clock::clock_driver::SystemClockDriver;
+use ${crateName}::infrastructure::persistence::health::system_clock_adapter::SystemClockAdapter;
+use ${crateName}::presentation::web::health::web_server::serve_single_connection;
 use std::net::TcpListener;
 
 pub fn create_app(context_name: &str) -> CheckHealthService<SystemClockAdapter<SystemClockDriver>> {
@@ -370,13 +424,13 @@ try {
 }
 `;
 
-  files["tests/all_layers_test.rs"] = `use ${crateName}::application::get_health::{CheckHealthService, GetHealthUseCase};
-use ${crateName}::domain::health::{create_health_status, ClockPort, DomainError, HealthStatus};
-use ${crateName}::domain::result::DomainResult;
-use ${crateName}::infrastructure::drivers::clock_driver::RawClockDriver;
-use ${crateName}::infrastructure::repository::clock_mapper::map_epoch_seconds;
-use ${crateName}::infrastructure::repository::system_clock_adapter::SystemClockAdapter;
-use ${crateName}::presentation::web_server::serve_single_connection;
+  files["tests/all_layers_test.rs"] = `use ${crateName}::application::health::queries::get_health::{CheckHealthService, GetHealthUseCase};
+use ${crateName}::domain::health::health::{create_health_status, ClockPort, DomainError, HealthStatus};
+use ${crateName}::domain::shared::result::DomainResult;
+use ${crateName}::infrastructure::drivers::clock::clock_driver::RawClockDriver;
+use ${crateName}::infrastructure::persistence::health::clock_mapper::map_epoch_seconds;
+use ${crateName}::infrastructure::persistence::health::system_clock_adapter::SystemClockAdapter;
+use ${crateName}::presentation::web::health::web_server::serve_single_connection;
 use std::net::TcpListener;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -409,6 +463,7 @@ impl GetHealthUseCase for MockUseCase {
     }
 }
 
+/// UT-${C}-001, UT-${C}-002, UT-${C}-005, UT-${C}-006
 #[test]
 fn domain_and_application_all_branches() {
     assert!(matches!(create_health_status("${contextName}", " 2026-11-22 "), DomainResult::Ok(_)));
@@ -419,6 +474,7 @@ fn domain_and_application_all_branches() {
     assert!(matches!(err_svc.execute(), DomainResult::Err(_)));
 }
 
+/// UT-${C}-003, UT-${C}-004
 #[test]
 fn infrastructure_all_branches() {
     assert!(matches!(map_epoch_seconds(100), DomainResult::Ok(_)));
@@ -429,6 +485,7 @@ fn infrastructure_all_branches() {
     assert!(matches!(err_ad.current_iso(), DomainResult::Err(_)));
 }
 
+/// UT-${C}-007
 #[test]
 fn presentation_browser_all_branches() {
     let state = Arc::new(Mutex::new(DomainResult::Ok(HealthStatus {
@@ -499,6 +556,7 @@ CMD ["/app/server"]
 `;
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 if ! docker info >/dev/null 2>&1; then
   echo "ERROR: Docker daemon is not running; cannot execute Docker integration test." >&2
   exit 1
@@ -511,6 +569,7 @@ curl -fsS http://127.0.0.1:13003/ | grep -q "OK: ${contextName}"
   } else if (dist === "binary") {
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 cargo build --offline
 PORT=0 ./target/debug/${crateName} > /tmp/ai-ddd-rust.log 2>&1 &
 PID=$!
@@ -525,6 +584,7 @@ node -e "fetch(process.argv[1] + '/').then(async r => { const t = await r.text()
   } else {
     files["scripts/test-integration.sh"] = `#!/usr/bin/env bash
 set -euo pipefail
+# IT-${C}-001, IT-${C}-002
 cargo build --offline
 echo "PASS: Rust library integration build verified drivers/ and crate exports"
 `;

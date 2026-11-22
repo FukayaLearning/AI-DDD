@@ -29,7 +29,7 @@
 
 ## 6. スケルトン生成の追従
 
-- [ ] 6.1 `src/skeletons/{typescript,python,go,rust}.js` をモジュール構造（D5）・`presentation/web/i18n`（en + ユーザー言語）・ID 付きサンプル仕様/テスト・`docs/testing/` 雛形・`docs/domain/*.<locale>.md`（ハッシュ付き）生成に更新する。4 言語 × 3 配布形態 × `--locale en|ja` で `init` → `ai-ddd verify` → `ai-ddd trace --check` が成功し、生成スケルトンのテストが通ることを `tests/cli.test.mjs` で確認する
+- [x] 6.1 `src/skeletons/{typescript,python,go,rust}.js` をモジュール構造（D5）・`presentation/web/i18n`（en + ユーザー言語）・ID 付きサンプル仕様/テスト・`docs/testing/` 雛形・`docs/domain/*.<locale>.md`（ハッシュ付き）生成に更新する。4 言語 × 3 配布形態 × `--locale en|ja` で `init` → `ai-ddd verify` → `ai-ddd trace --check` が成功し、生成スケルトンのテストが通ることを `tests/cli.test.mjs` で確認する
 
 ## 7. TypeScript サンプルの移行（規約の確定）
 
