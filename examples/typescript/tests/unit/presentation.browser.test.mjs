@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { domainError } from "../../src/domain/shared/errors.ts";
 import { err, ok } from "../../src/domain/shared/result.ts";
-import { startOrderWebServer } from "../../src/presentation/web/order/order_web_server.ts";
-import { enMessages } from "../../src/presentation/web/i18n/en.ts";
-import { jaMessages } from "../../src/presentation/web/i18n/ja.ts";
+import { startOrderWebServer } from "../../src/presentation/controllers/order/order_controller.ts";
+import { enMessages } from "../../src/presentation/i18n/en.ts";
+import { jaMessages } from "../../src/presentation/i18n/ja.ts";
 import { launchHeadlessBrowser } from "../../scripts/browser-helper.mjs";
 
 const cases = [];

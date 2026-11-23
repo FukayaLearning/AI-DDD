@@ -1,10 +1,10 @@
 import { domainError, type DomainError } from "../../../domain/shared/errors.ts";
-import type { Order } from "../../../domain/order/order.ts";
-import type { OrderRepository } from "../../../domain/order/order_repository.ts";
+import type { Order } from "../../../domain/entities/order/order.ts";
+import type { OrderRepository } from "../../../domain/repositories/order/order_repository.ts";
 import { err, ok, type Result } from "../../../domain/shared/result.ts";
-import type { OrderId } from "../../../domain/shared/value_objects.ts";
+import type { OrderId } from "../../../domain/value_objects/shared/identifiers.ts";
 import type { KeyValueStorageDriver } from "../../drivers/kv/kv_driver.ts";
-import { fromOrderRecord, toOrderRecord, type OrderRecord } from "./order_mapper.ts";
+import { fromOrderRecord, toOrderRecord, type OrderRecord } from "../../mappers/order/order_mapper.ts";
 
 export class DriverOrderRepository implements OrderRepository {
   private readonly driver: KeyValueStorageDriver;

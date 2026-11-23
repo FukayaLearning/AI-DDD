@@ -1,19 +1,19 @@
 import assert from "node:assert/strict";
-import { Order } from "../../src/domain/order/order.ts";
+import { Order } from "../../src/domain/entities/order/order.ts";
+import { createMoney } from "../../src/domain/value_objects/shared/money.ts";
+import { createQuantity } from "../../src/domain/value_objects/order/quantity.ts";
 import {
   createCustomerId,
-  createMoney,
   createOrderId,
   createProductId,
-  createQuantity,
-} from "../../src/domain/shared/value_objects.ts";
-import { InventoryGateway } from "../../src/infrastructure/acl/inventory/inventory_gateway.ts";
-import { PaymentGateway } from "../../src/infrastructure/acl/payment/payment_gateway.ts";
-import { DriverOrderRepository } from "../../src/infrastructure/persistence/order/driver_order_repository.ts";
+} from "../../src/domain/value_objects/shared/identifiers.ts";
+import { InventoryGateway } from "../../src/infrastructure/gateways/inventory/inventory_gateway.ts";
+import { PaymentGateway } from "../../src/infrastructure/gateways/payment/payment_gateway.ts";
+import { DriverOrderRepository } from "../../src/infrastructure/repositories/order/driver_order_repository.ts";
 import {
   fromOrderRecord,
   toOrderRecord,
-} from "../../src/infrastructure/persistence/order/order_mapper.ts";
+} from "../../src/infrastructure/mappers/order/order_mapper.ts";
 
 const cases = [];
 function test(name, fn) {

@@ -1,14 +1,12 @@
 import assert from "node:assert/strict";
-import { Order } from "../../src/domain/order/order.ts";
+import { Order } from "../../src/domain/entities/order/order.ts";
+import { addMoney, createMoney, multiplyMoney } from "../../src/domain/value_objects/shared/money.ts";
+import { createQuantity } from "../../src/domain/value_objects/order/quantity.ts";
 import {
-  addMoney,
   createCustomerId,
-  createMoney,
   createOrderId,
   createProductId,
-  createQuantity,
-  multiplyMoney,
-} from "../../src/domain/shared/value_objects.ts";
+} from "../../src/domain/value_objects/shared/identifiers.ts";
 
 const cases = [];
 function test(name, fn) {

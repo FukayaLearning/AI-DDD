@@ -1,8 +1,8 @@
 import { domainError, type DomainError } from "../../../domain/shared/errors.ts";
-import type { OrderLine } from "../../../domain/order/order.ts";
+import type { OrderLine } from "../../../domain/entities/order/order.ts";
 import { err, ok, type Result } from "../../../domain/shared/result.ts";
-import type { OrderId } from "../../../domain/shared/value_objects.ts";
-import type { InventoryPort } from "../../../application/shared/ports.ts";
+import type { OrderId } from "../../../domain/value_objects/shared/identifiers.ts";
+import type { InventoryPort } from "../../../application/ports/inventory/inventory_port.ts";
 import type { HttpJsonDriver, RawHttpResponse } from "../../drivers/http/http_driver.ts";
 
 export function mapInventoryHttpResponse(res: RawHttpResponse): Result<void, DomainError> {

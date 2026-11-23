@@ -1,6 +1,6 @@
-<!-- ai-ddd-translation: source=order.md sha256=71005d44f5fad88a448389afbe1619f37e73862b347f6c12353a0eb07ffbb143 locale=ja -->
+<!-- ai-ddd-translation: source=order.md sha256=01a76eef21ae6e7864a0a0a100c49d59647a722e4f1c91fe4466f78760920c46 locale=ja -->
 
-# 単体試験仕様書 — application/order
+# 単体試験仕様書 — application/services/order, application/dtos/order, application/ports/{inventory,payment}
 
 | ID | 設計要素 | 試験技法 | 入力 | 期待結果 | 根拠 | 自動試験 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |

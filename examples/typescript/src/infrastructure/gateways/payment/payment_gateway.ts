@@ -1,7 +1,8 @@
 import { domainError, type DomainError } from "../../../domain/shared/errors.ts";
 import { err, ok, type Result } from "../../../domain/shared/result.ts";
-import type { Money, OrderId } from "../../../domain/shared/value_objects.ts";
-import type { PaymentPort } from "../../../application/shared/ports.ts";
+import type { Money } from "../../../domain/value_objects/shared/money.ts";
+import type { OrderId } from "../../../domain/value_objects/shared/identifiers.ts";
+import type { PaymentPort } from "../../../application/ports/payment/payment_port.ts";
 import type { HttpJsonDriver, RawHttpResponse } from "../../drivers/http/http_driver.ts";
 
 export function mapPaymentHttpResponse(res: RawHttpResponse): Result<void, DomainError> {

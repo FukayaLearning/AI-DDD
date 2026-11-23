@@ -1,13 +1,13 @@
 import path from "node:path";
-import { OrderApplicationService } from "./application/order/commands/order_service.ts";
-import { InventoryGateway } from "./infrastructure/acl/inventory/inventory_gateway.ts";
-import { PaymentGateway } from "./infrastructure/acl/payment/payment_gateway.ts";
+import { OrderApplicationService } from "./application/services/order/order_service.ts";
+import { InventoryGateway } from "./infrastructure/gateways/inventory/inventory_gateway.ts";
+import { PaymentGateway } from "./infrastructure/gateways/payment/payment_gateway.ts";
 import { FetchHttpJsonDriver } from "./infrastructure/drivers/http/http_driver.ts";
 import { FileKvDriver } from "./infrastructure/drivers/kv/kv_driver.ts";
-import { DriverOrderRepository } from "./infrastructure/persistence/order/driver_order_repository.ts";
-import { startOrderWebServer } from "./presentation/web/order/order_web_server.ts";
-import { enMessages } from "./presentation/web/i18n/en.ts";
-import { jaMessages } from "./presentation/web/i18n/ja.ts";
+import { DriverOrderRepository } from "./infrastructure/repositories/order/driver_order_repository.ts";
+import { startOrderWebServer } from "./presentation/controllers/order/order_controller.ts";
+import { enMessages } from "./presentation/i18n/en.ts";
+import { jaMessages } from "./presentation/i18n/ja.ts";
 
 export function createOrderingApp(options: {
   dataDir: string;

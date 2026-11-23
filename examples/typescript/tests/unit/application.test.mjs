@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { OrderApplicationService } from "../../src/application/order/commands/order_service.ts";
+import * as orderDtoModule from "../../src/application/dtos/order/order_dto.ts";
+import { OrderApplicationService } from "../../src/application/services/order/order_service.ts";
 import { domainError } from "../../src/domain/shared/errors.ts";
 import { err, ok } from "../../src/domain/shared/result.ts";
 

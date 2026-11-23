@@ -8,20 +8,20 @@
 
 ## Tactical Domain Model (`domain/`)
 
-- **Value Objects**: `OrderId`, `CustomerId`, `ProductId`, `Money` (`JPY` | `USD`, `add`, `multiply`), `Quantity` (1..100).
-- **Entities & Aggregate Roots**: `OrderLine` entity and `Order` aggregate root (`Draft` | `Confirmed` | `Cancelled`). Invariants: 1..5 lines, no duplicate `ProductId`, single currency across lines, `confirm()` only from `Draft`, `cancel()` forbidden from `Cancelled`.
+- **Value Objects**: `OrderId`, `CustomerId`, `ProductId`, `Money` (`JPY` | `USD`, `add`, `multiply`) in `domain/value_objects/shared/`; `Quantity` (1..100) in `domain/value_objects/order/`.
+- **Entities & Aggregate Roots**: `OrderLine` entity and `Order` aggregate root (`Draft` | `Confirmed` | `Cancelled`) in `domain/entities/order/`. Invariants: 1..5 lines, no duplicate `ProductId`, single currency across lines, `confirm()` only from `Draft`, `cancel()` forbidden from `Cancelled`.
 - **Domain Events**: `OrderConfirmedEvent`, `OrderCancelledEvent`.
-- **Domain Ports**: `OrderRepository`, `InventoryPort`, `PaymentPort`.
+- **Domain Ports**: `OrderRepository` in `domain/repositories/order/`; `InventoryPort` and `PaymentPort` in `application/ports/{inventory,payment}/`.
 - **Error Modeling (`Result<T, E>`)**: Exhaustive `DomainError` codes (`INVALID_ORDER_ID`, `INVALID_CUSTOMER_ID`, `INVALID_PRODUCT_ID`, `INVALID_MONEY_AMOUNT`, `CURRENCY_MISMATCH`, `INVALID_QUANTITY`, `EMPTY_ORDER_LINES`, `TOO_MANY_ORDER_LINES`, `DUPLICATE_PRODUCT`, `INVALID_ORDER_STATE`, `INSUFFICIENT_STOCK`, `PAYMENT_DECLINED`, `EXTERNAL_TIMEOUT`, `REPOSITORY_ERROR`, `ORDER_NOT_FOUND`).
 
 ## 4-Layer Architecture & Infrastructure 3-Part Separation
 
 - **Dependency Rule**: `presentation -> application -> domain <- infrastructure`; `presentation` never imports `infrastructure`; `main.ts` wires DI.
 - **Infrastructure Split**:
-  1. **Pure Mapper (`order_mapper.ts`)**: `toRecord` / `fromRecord` pure transformations tested without mocks.
-  2. **Minimal Branchless Drivers (`infrastructure/drivers/kv_driver.ts`, `http_driver.ts`)**: Raw JSON file KV read/write and raw `fetch` HTTP POST ONLY; zero `if`/`switch`/`match`/ternary branches.
-  3. **DI Repository & ACL Gateways (`driver_order_repository.ts`, `external_gateways.ts`)**: Accept driver interfaces via DI and handle missing keys, malformed JSON, timeouts, stock shortages, and payment declines via `Result<T, E>`.
-- **Presentation (`presentation/order_web_server.ts`)**: SSR HTML server accepting `OrderUseCases` via DI; verified via Mock + Headless Chromium browser flows.
+  1. **Pure Mapper (`infrastructure/mappers/order/order_mapper.ts`)**: `toRecord` / `fromRecord` pure transformations tested without mocks.
+  2. **Minimal Branchless Drivers (`infrastructure/drivers/kv/`, `infrastructure/drivers/http/`)**: Raw JSON file KV read/write and raw `fetch` HTTP POST ONLY; zero `if`/`switch`/`match`/ternary branches.
+  3. **DI Repository & Gateways (`infrastructure/repositories/order/`, `infrastructure/gateways/{inventory,payment}/`)**: Accept driver interfaces via DI and handle missing keys, malformed JSON, timeouts, stock shortages, and payment declines via `Result<T, E>`.
+- **Presentation (`presentation/controllers/order/` + `presentation/views/order/`)**: SSR HTML controller accepting `OrderUseCases` via DI and pure view rendering functions; verified via Mock + Headless Chromium browser flows.
 
 ## Unit-Test Exclusions & C1 100% Coverage Governance
 

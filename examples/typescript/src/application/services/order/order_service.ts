@@ -1,42 +1,17 @@
 import type { DomainError } from "../../../domain/shared/errors.ts";
-import { Order, type OrderLine } from "../../../domain/order/order.ts";
-import type { OrderRepository } from "../../../domain/order/order_repository.ts";
+import { Order, type OrderLine } from "../../../domain/entities/order/order.ts";
+import type { OrderRepository } from "../../../domain/repositories/order/order_repository.ts";
 import { err, ok, type Result } from "../../../domain/shared/result.ts";
 import {
   createCustomerId,
-  createMoney,
   createOrderId,
   createProductId,
-  createQuantity,
-  type Currency,
-  type Money,
-} from "../../../domain/shared/value_objects.ts";
-import type { InventoryPort, PaymentPort } from "../../shared/ports.ts";
-
-export interface PlaceOrderLineInput {
-  readonly productId: string;
-  readonly quantity: number;
-  readonly unitAmount: number;
-  readonly currency: Currency;
-}
-
-export interface PlaceOrderCommand {
-  readonly orderId: string;
-  readonly customerId: string;
-  readonly lines: readonly PlaceOrderLineInput[];
-}
-
-export interface OrderSummaryDto {
-  readonly orderId: string;
-  readonly customerId: string;
-  readonly status: "Draft" | "Confirmed" | "Cancelled";
-  readonly total: Money;
-  readonly lines: readonly {
-    readonly productId: string;
-    readonly quantity: number;
-    readonly unitPrice: Money;
-  }[];
-}
+} from "../../../domain/value_objects/shared/identifiers.ts";
+import { createMoney, type Money } from "../../../domain/value_objects/shared/money.ts";
+import { createQuantity } from "../../../domain/value_objects/order/quantity.ts";
+import type { InventoryPort } from "../../ports/inventory/inventory_port.ts";
+import type { PaymentPort } from "../../ports/payment/payment_port.ts";
+import type { OrderSummaryDto, PlaceOrderCommand } from "../../dtos/order/order_dto.ts";
 
 export interface OrderUseCases {
   placeOrder(cmd: PlaceOrderCommand): Promise<Result<OrderSummaryDto, DomainError>>;
