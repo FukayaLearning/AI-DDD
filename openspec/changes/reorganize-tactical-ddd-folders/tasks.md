@@ -17,5 +17,5 @@
 - [x] 4.1 `examples/typescript/` を新フォルダ構成へ移行し、設計書・テスト仕様書・翻訳スタンプ・トレーサビリティマトリクスを更新の上、`ai-ddd verify --target examples/typescript` および単体/C1テストが通過することを確認する
 - [x] 4.2 `examples/python/` を新フォルダ構成へ移行し、設計書・テスト仕様書・翻訳スタンプ・トレーサビリティマトリクスを更新の上、`ai-ddd verify --target examples/python` および単体/C1テストが通過することを確認する
 - [x] 4.3 `examples/go/` を新フォルダ構成へ移行し、設計書・テスト仕様書・翻訳スタンプ・トレーサビリティマトリクスを更新の上、`ai-ddd verify --target examples/go` および単体/C1テストが通過することを確認する
-- [ ] 4.4 `examples/rust/` を新フォルダ構成へ移行し、設計書・テスト仕様書・翻訳スタンプ・トレーサビリティマトリクスを更新の上、`ai-ddd verify --target examples/rust` および単体/C1テストが通過することを確認する
+- [x] 4.4 `examples/rust/` を新フォルダ構成へ移行し、設計書・テスト仕様書・翻訳スタンプ・トレーサビリティマトリクスを更新の上、`ai-ddd verify --target examples/rust` および単体/C1テストが通過することを確認する
 - [ ] 4.5 `npm run verify:examples` および `npm test` を実行し、全スイートがエラー・ドリフトなしで通過することを確認する

@@ -1,4 +1,4 @@
-<!-- ai-ddd-translation: source=context-map.md sha256=47ad72342085498833e930cf85e1b4b4026159d2713cd9f95b4146d16ce225a7 locale=ja -->
+<!-- ai-ddd-translation: source=context-map.md sha256=95612cbb718f5c5bb56b743008671f5db6db95718b30e4a5d7c1562c5af504a6 locale=ja -->
 
 # コンテキストマップ — ordering
 
@@ -9,5 +9,5 @@
 
 | 上流 / 外部コンテキスト | リポジトリ | 関係 / パターン | ポート / ACL | 状態 |
 | :--- | :--- | :--- | :--- | :--- |
-| `inventory` | 別リポジトリ | 腐敗防止層 (Customer-Supplier) | `InventoryPort` / `InventoryGateway` | `T.B.D.` (リポジトリ間仕様連携) |
-| `payment` | 別リポジトリ | 腐敗防止層 (Customer-Supplier) | `PaymentPort` / `PaymentGateway` | `T.B.D.` (リポジトリ間仕様連携) |
+| `inventory` | 別リポジトリ | 腐敗防止層 (Customer-Supplier) | `InventoryPort` (`application/ports/inventory/`) / `InventoryGateway` (`infrastructure/gateways/inventory/`) | `T.B.D.` (リポジトリ間仕様連携) |
+| `payment` | 別リポジトリ | 腐敗防止層 (Customer-Supplier) | `PaymentPort` (`application/ports/payment/`) / `PaymentGateway` (`infrastructure/gateways/payment/`) | `T.B.D.` (リポジトリ間仕様連携) |

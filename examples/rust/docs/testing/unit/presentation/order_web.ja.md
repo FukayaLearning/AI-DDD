@@ -1,6 +1,6 @@
-<!-- ai-ddd-translation: source=order_web.md sha256=6dd4201e4e599c55d2301132e5132aacc82b74563f022655be885b91d8136b8b locale=ja -->
+<!-- ai-ddd-translation: source=order_web.md sha256=3e1a26107708ff95955bb0786ae510b7cf50de05a4429880c615cb8559a4c82d locale=ja -->
 
-# 単体試験仕様書 — presentation/web/order
+# 単体試験仕様書 — presentation/controllers/order, presentation/views/order, presentation/i18n
 
 | ID | 設計要素 | 試験技法 | 入力 | 期待結果 | 根拠 | 自動試験 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |

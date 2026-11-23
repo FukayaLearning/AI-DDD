@@ -1,12 +1,12 @@
-use ordering_rs::application::order::commands::order_service::OrderApplicationService;
-use ordering_rs::infrastructure::acl::inventory::inventory_gateway::InventoryGateway;
-use ordering_rs::infrastructure::acl::payment::payment_gateway::PaymentGateway;
+use ordering_rs::application::services::order::order_service::OrderApplicationService;
 use ordering_rs::infrastructure::drivers::http::http_driver::TcpHttpJsonDriver;
 use ordering_rs::infrastructure::drivers::kv::kv_driver::FileKvDriver;
-use ordering_rs::infrastructure::persistence::order::driver_order_repository::DriverOrderRepository;
-use ordering_rs::presentation::web::i18n::en::EN_MESSAGES;
-use ordering_rs::presentation::web::i18n::ja::JA_MESSAGES;
-use ordering_rs::presentation::web::order::order_web_server::serve_single_connection;
+use ordering_rs::infrastructure::gateways::inventory::inventory_gateway::InventoryGateway;
+use ordering_rs::infrastructure::gateways::payment::payment_gateway::PaymentGateway;
+use ordering_rs::infrastructure::repositories::order::driver_order_repository::DriverOrderRepository;
+use ordering_rs::presentation::controllers::order::order_controller::serve_single_connection;
+use ordering_rs::presentation::i18n::en::EN_MESSAGES;
+use ordering_rs::presentation::i18n::ja::JA_MESSAGES;
 use std::net::TcpListener;
 
 pub fn create_ordering_app(
@@ -29,11 +29,20 @@ pub fn create_ordering_app(
 fn main() {
     let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
     let data_dir = std::env::var("ORDER_DATA_DIR").unwrap_or_else(|_| ".order-data".to_string());
-    let inv_url = std::env::var("INVENTORY_URL").unwrap_or_else(|_| "http://127.0.0.1:4001/reserve".to_string());
-    let pay_url = std::env::var("PAYMENT_URL").unwrap_or_else(|_| "http://127.0.0.1:4002/charge".to_string());
-    let timeout_ms: u64 = std::env::var("HTTP_TIMEOUT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(5000);
+    let inv_url = std::env::var("INVENTORY_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:4001/reserve".to_string());
+    let pay_url =
+        std::env::var("PAYMENT_URL").unwrap_or_else(|_| "http://127.0.0.1:4002/charge".to_string());
+    let timeout_ms: u64 = std::env::var("HTTP_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5000);
     let app_locale = std::env::var("APP_LOCALE").unwrap_or_else(|_| "ja".to_string());
-    let messages = if app_locale == "en" { &EN_MESSAGES } else { &JA_MESSAGES };
+    let messages = if app_locale == "en" {
+        &EN_MESSAGES
+    } else {
+        &JA_MESSAGES
+    };
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).expect("bind failed");
     let addr = listener.local_addr().expect("addr failed");

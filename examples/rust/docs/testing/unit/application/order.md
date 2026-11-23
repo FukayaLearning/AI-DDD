@@ -1,4 +1,4 @@
-# Unit Test Specification — application/order
+# Unit Test Specification — application/services/order, application/dtos/order, application/ports/{inventory,payment}
 
 | ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |

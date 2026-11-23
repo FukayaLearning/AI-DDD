@@ -1,6 +1,6 @@
-<!-- ai-ddd-translation: source=order.md sha256=90af779e49497d4622a0049f0543c9c172041e998899ceaf75c5d9798a8b9a2d locale=ja -->
+<!-- ai-ddd-translation: source=order.md sha256=1f640d90e635f6fa83c3382b64e30d9ea4c7801ad7c720e4bcb71700d9823e8d locale=ja -->
 
-# 単体試験仕様書 — domain/order
+# 単体試験仕様書 — domain/entities/order, domain/value_objects/shared, domain/value_objects/order
 
 | ID | 設計要素 | 試験技法 | 入力 | 期待結果 | 根拠 | 自動試験 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |

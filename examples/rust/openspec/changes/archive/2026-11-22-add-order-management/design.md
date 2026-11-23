@@ -8,19 +8,19 @@
 
 ## Tactical Domain Model (`src/domain/`)
 
-- **Value Objects**: `OrderId`, `CustomerId`, `ProductId`, `Money` (`Currency::JPY` | `Currency::USD`), `Quantity` (1..100).
-- **Entities & Aggregate Roots**: `OrderLine`, `Order` (`OrderStatus::Draft` | `Confirmed` | `Cancelled`).
-- **Domain Events**: `DomainEvent::OrderConfirmedEvent`, `DomainEvent::OrderCancelledEvent`.
-- **Domain Ports**: `OrderRepository`, `InventoryPort`, `PaymentPort`.
+- **Value Objects**: `OrderId`, `CustomerId`, `ProductId`, `Money` (`Currency::JPY` | `Currency::USD`) in `src/domain/value_objects/shared/`; `Quantity` (1..100) in `src/domain/value_objects/order/`.
+- **Entities & Aggregate Roots**: `OrderLine`, `Order` (`OrderStatus::Draft` | `Confirmed` | `Cancelled`) in `src/domain/entities/order/`.
+- **Domain Events**: `DomainEvent::OrderConfirmedEvent`, `DomainEvent::OrderCancelledEvent` in `src/domain/entities/order/`.
+- **Domain Ports**: `OrderRepository` in `src/domain/repositories/order/`; `InventoryPort` and `PaymentPort` in `src/application/ports/{inventory,payment}/`.
 - **Error Modeling (`DomainResult<T, DomainError>`)**: Explicit value-based errors (`Result`-style enum; zero domain panics).
 
 ## 4-Layer Architecture & Infrastructure 3-Part Separation
 
 - **Dependency Rule**: `presentation -> application -> domain <- infrastructure`; `presentation` never references `infrastructure`.
 - **Infrastructure Split**:
-  1. Pure `order_mapper` transformations (`to_record`, `from_record`).
-  2. Branchless `src/infrastructure/drivers/{kv_driver.rs,http_driver.rs}` (no `if`/`else`/`match`).
-  3. `DriverOrderRepository`, `InventoryGateway`, `PaymentGateway` unit-tested with mock drivers.
+  1. Pure `src/infrastructure/mappers/order/order_mapper` transformations (`encode_order_record`, `decode_order_record`).
+  2. Branchless `src/infrastructure/drivers/{kv,http}/` (no `if`/`else`/`match`).
+  3. `src/infrastructure/repositories/order/DriverOrderRepository` and `src/infrastructure/gateways/{inventory,payment}/` unit-tested with mock drivers.
 
 ## Unit-Test Exclusions & C1 100% Coverage Governance
 

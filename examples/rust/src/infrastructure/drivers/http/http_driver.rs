@@ -30,9 +30,13 @@ impl HttpJsonDriver for TcpHttpJsonDriver {
             body_json.len(),
             body_json
         );
-        stream.write_all(req.as_bytes()).map_err(|e| e.to_string())?;
+        stream
+            .write_all(req.as_bytes())
+            .map_err(|e| e.to_string())?;
         let mut resp = String::new();
-        stream.read_to_string(&mut resp).map_err(|e| e.to_string())?;
+        stream
+            .read_to_string(&mut resp)
+            .map_err(|e| e.to_string())?;
         Ok(resp)
     }
 }
