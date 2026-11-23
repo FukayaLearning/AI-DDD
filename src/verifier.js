@@ -37,6 +37,17 @@ const SOURCE_EXTENSIONS = new Set([".ts", ".mts", ".js", ".mjs", ".py", ".go", "
 const MODULE_DECLARATION_FILES = new Set(["mod.rs", "lib.rs", "__init__.py"]);
 const SUBDIVIDED_LAYERS = new Set(["domain", "application", "infrastructure", "presentation"]);
 
+// Tactical-pattern / role folder whitelist for the 2nd level of each layer.
+const LAYER_PATTERN_WHITELIST = {
+  domain: new Set(["entities", "value_objects", "services", "repositories", "shared"]),
+  application: new Set(["services", "ports", "dtos"]),
+  infrastructure: new Set(["repositories", "gateways", "mappers", "drivers"]),
+  presentation: new Set(["controllers", "views", "i18n"]),
+};
+
+// Pattern folders that may legitimately contain files directly (no aggregate subfolder).
+const PATTERN_FOLDERS_ALLOWING_DIRECT_FILES = new Set(["domain/shared", "presentation/i18n"]);
+
 function walkFiles(dir, results = []) {
   if (!fs.existsSync(dir)) return results;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -155,17 +166,62 @@ function detectLayerSubpath(relPath) {
   const layer = m[1];
   const rest = m[2];
   const parts = rest.split("/");
-  return { layer, parts, isLooseRootFile: parts.length === 1, moduleName: parts[0] };
+  return {
+    layer,
+    parts,
+    isLooseRootFile: parts.length === 1,
+    pattern: parts.length >= 2 ? parts[0] : null,
+    moduleName: parts.length >= 2 ? parts[1] : null,
+  };
+}
+
+function parsePythonDomainTarget(modText, relPath) {
+  // Absolute import: domain.<pattern>.<aggregate>
+  const abs = modText.match(/(?:^|\.)domain\.([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)/);
+  if (abs) return { pattern: abs[1], aggregate: abs[2] };
+
+  const rel = modText.match(/^(\.+)([a-zA-Z0-9_.]+)/);
+  if (!rel) return null;
+  const dots = rel[1].length;
+  const segs = rel[2].split(".").filter(Boolean);
+  if (segs[0] === "domain") {
+    return segs.length >= 2
+      ? { pattern: segs[1], aggregate: segs[2] ?? null }
+      : null;
+  }
+
+  const norm = relPath.replace(/\\/g, "/");
+  const pm = norm.match(/^(?:src|internal)\/(.+)\/[^/]+\.py$/);
+  if (!pm) return null;
+  const pkgSegs = pm[1].split("/");
+  const ascend = dots - 1;
+  const baseSegs = pkgSegs.slice(0, Math.max(0, pkgSegs.length - ascend));
+  const di = baseSegs.lastIndexOf("domain");
+  if (di === -1) return null;
+  const remaining = baseSegs.slice(di + 1).concat(segs);
+  if (remaining.length === 0) return null;
+  return { pattern: remaining[0], aggregate: remaining[1] ?? null };
 }
 
 function extractDomainAggregateDeps(rawCode, ext, relPath) {
   const code = ext === ".rs" ? isRustModTestBlockRemoved(rawCode) : rawCode;
   const sub = detectLayerSubpath(relPath);
-  if (!sub || sub.layer !== "domain" || sub.isLooseRootFile || sub.moduleName === "shared") {
+  // Aggregate isolation applies to 3rd-level modules: domain/<pattern>/<aggregate>/
+  if (!sub || sub.layer !== "domain" || sub.parts.length < 3 || sub.pattern === "shared") {
     return [];
   }
   const selfAgg = sub.moduleName;
-  const found = new Set();
+  if (!selfAgg || selfAgg === "shared") {
+    return [];
+  }
+  const selfPattern = sub.pattern;
+  const found = [];
+
+  const record = (pattern, aggregate) => {
+    if (!pattern || pattern === "shared") return;
+    if (!aggregate || aggregate === selfAgg || aggregate === "shared") return;
+    found.push({ pattern, aggregate });
+  };
 
   if (ext === ".ts" || ext === ".mts" || ext === ".js" || ext === ".mjs") {
     const importRegex = /(?:import|export)\s+(?:[^"']*?\s+from\s+)?["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)/g;
@@ -176,24 +232,15 @@ function extractDomainAggregateDeps(rawCode, ext, relPath) {
       const resolved = path.posix.normalize(
         path.posix.join("/", path.posix.dirname(relPath.replace(/\\/g, "/")), spec)
       );
-      const dm = resolved.match(/^\/(?:src|internal)\/domain\/([^/]+)(?:\/|$)/);
-      if (dm && dm[1] !== selfAgg && dm[1] !== "shared") {
-        found.add(dm[1]);
-      }
+      const dm = resolved.match(/^\/(?:src|internal)\/domain\/([^/]+)\/([^/]+)/);
+      if (dm) record(dm[1], dm[2]);
     }
   } else if (ext === ".py") {
     const pyRegex = /^\s*(?:from\s+([.\w]+)\s+import|import\s+([\w.,\s]+))/gm;
     let m;
     while ((m = pyRegex.exec(code)) !== null) {
-      const modText = m[1] || m[2];
-      const dm = modText.match(/(?:^|\.)domain\.([a-zA-Z0-9_]+)/);
-      if (dm && dm[1] !== selfAgg && dm[1] !== "shared") {
-        found.add(dm[1]);
-      }
-      const relM = modText.match(/^\.\.([a-zA-Z0-9_]+)/);
-      if (relM && relM[1] !== selfAgg && relM[1] !== "shared") {
-        found.add(relM[1]);
-      }
+      const target = parsePythonDomainTarget(m[1] || m[2], relPath);
+      if (target) record(target.pattern, target.aggregate);
     }
   } else if (ext === ".go") {
     const importBlock = code.match(/import\s*(?:\([^)]*\)|"[^"]+")/g) || [];
@@ -201,23 +248,21 @@ function extractDomainAggregateDeps(rawCode, ext, relPath) {
       const goRegex = /["']([^"']+)["']/g;
       let m;
       while ((m = goRegex.exec(block)) !== null) {
-        const dm = m[1].match(/\/internal\/domain\/([^/"']+)/);
-        if (dm && dm[1] !== selfAgg && dm[1] !== "shared") {
-          found.add(dm[1]);
-        }
+        const dm = m[1].match(/(?:^|\/)internal\/domain\/([^/"']+)\/([^/"']+)/);
+        if (dm) record(dm[1], dm[2]);
       }
     }
   } else if (ext === ".rs") {
-    const rustRegex = /\b(?:use\s+)?crate::domain::([a-zA-Z0-9_]+)(?:::|;|\b)/g;
+    const rustRegex = /\b(?:use\s+)?crate::domain::([a-zA-Z0-9_]+)::([a-zA-Z0-9_]+)/g;
     let m;
     while ((m = rustRegex.exec(code)) !== null) {
-      if (m[1] !== selfAgg && m[1] !== "shared") {
-        found.add(m[1]);
-      }
+      record(m[1], m[2]);
     }
   }
 
-  return [...found];
+  const unique = new Map();
+  for (const dep of found) unique.set(`${dep.pattern}/${dep.aggregate}`, dep);
+  return [...unique.values()];
 }
 
 function isDriverFile(relPath) {
@@ -404,18 +449,46 @@ export function verifyProject(targetDir) {
     dirFileCounts.set(relDir, (dirFileCounts.get(relDir) || 0) + 1);
     const content = fs.readFileSync(file, "utf8");
 
-    // Structure rules: no loose files at layer roots & aggregate isolation
+    // Structure rules: tactical-pattern whitelist, no loose files, & aggregate isolation
     const subpath = detectLayerSubpath(rel);
     if (subpath && SUBDIVIDED_LAYERS.has(subpath.layer)) {
-      if (subpath.isLooseRootFile && !MODULE_DECLARATION_FILES.has(path.posix.basename(rel))) {
-        v2Sink.push(
-          `[Loose Layer File] ${rel} (layer '${subpath.layer}'): place source files inside a module subdirectory (e.g., ${subpath.layer}/shared/ or ${subpath.layer}/<module>/)`
-        );
-      }
-      if (subpath.layer === "domain") {
-        for (const otherAgg of extractDomainAggregateDeps(content, ext, rel)) {
+      const isModuleDeclaration = MODULE_DECLARATION_FILES.has(path.posix.basename(rel));
+
+      // 1st level: no loose source files directly under a layer root.
+      if (subpath.isLooseRootFile) {
+        if (!isModuleDeclaration) {
           v2Sink.push(
-            `[Aggregate Isolation Violation] ${rel}: domain/${subpath.moduleName}/ MUST NOT depend on domain/${otherAgg}/ (reference via IDs in domain/shared/)`
+            `[Loose Layer File] ${rel} (layer '${subpath.layer}'): place source files inside <layer>/<tactical-pattern>/<aggregate-or-module>/ (e.g., ${subpath.layer}/shared/ or ${subpath.layer}/<pattern>/<module>/)`
+          );
+        }
+      } else {
+        const patternKey = `${subpath.layer}/${subpath.pattern}`;
+
+        // 2nd level: tactical-pattern folder name must be on the layer whitelist.
+        if (!LAYER_PATTERN_WHITELIST[subpath.layer].has(subpath.pattern)) {
+          const allowed = [...LAYER_PATTERN_WHITELIST[subpath.layer]].join(", ");
+          v2Sink.push(
+            `[Unauthorized Pattern Folder] ${rel} (layer '${subpath.layer}'): '${subpath.pattern}' is not an allowed tactical pattern folder; allowed folders: ${allowed}`
+          );
+        }
+
+        // 2nd level: no loose source files directly under a pattern folder
+        // (except domain/shared and presentation/i18n, which hold files directly).
+        if (
+          subpath.parts.length === 2 &&
+          !PATTERN_FOLDERS_ALLOWING_DIRECT_FILES.has(patternKey) &&
+          !isModuleDeclaration
+        ) {
+          v2Sink.push(
+            `[Loose Pattern File] ${rel} (layer '${subpath.layer}', pattern '${subpath.pattern}'): place source files inside a ${subpath.pattern}/<aggregate-or-module>/ subfolder`
+          );
+        }
+      }
+
+      if (subpath.layer === "domain") {
+        for (const dep of extractDomainAggregateDeps(content, ext, rel)) {
+          v2Sink.push(
+            `[Aggregate Isolation Violation] ${rel}: domain/${subpath.pattern}/${subpath.moduleName}/ MUST NOT depend on domain/${dep.pattern}/${dep.aggregate}/ (reference via IDs in domain/value_objects/shared/)`
           );
         }
       }

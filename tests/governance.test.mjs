@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { verifyProject } from "../src/verifier.js";
-import { stampTranslationFile } from "../src/i18n.js";
+import { stampTranslationFile, verifyUiCatalogs } from "../src/i18n.js";
 import { analyzeTraceability, writeTraceabilityMatrix } from "../src/tracer.js";
 import { verifyIntegrationChecklists, verifyTestCaseIds } from "../src/test-spec.js";
 
@@ -33,21 +33,43 @@ function writeFile(dir, rel, content) {
   fs.writeFileSync(full, content);
 }
 
-// 1. Structure rules: valid subdivided layout passes
+// 1. Structure rules: valid tactical-pattern x aggregate layout passes
 {
   const dir = makeFixture();
   try {
     writeFile(dir, "src/domain/shared/result.ts", "export const ok = true;\n");
     writeFile(
       dir,
-      "src/domain/order/order.ts",
-      'import { ok } from "../shared/result.ts";\nexport const x = ok;\n'
+      "src/domain/entities/order/order.ts",
+      'import { ok } from "../../shared/result.ts";\nexport const x = ok;\n'
     );
     writeFile(
       dir,
-      "src/application/order/commands/place_order.ts",
-      'import { x } from "../../../domain/order/order.ts";\nexport const y = x;\n'
+      "src/domain/value_objects/order/quantity.ts",
+      'import { x } from "../../entities/order/order.ts";\nexport const q = x;\n'
     );
+    writeFile(
+      dir,
+      "src/application/services/order/place_order.ts",
+      'import { x } from "../../../domain/entities/order/order.ts";\nexport const y = x;\n'
+    );
+    writeFile(
+      dir,
+      "src/infrastructure/mappers/order/order_mapper.ts",
+      'import { x } from "../../../domain/entities/order/order.ts";\nexport const m = x;\n'
+    );
+    writeFile(
+      dir,
+      "src/infrastructure/drivers/clock/clock_driver.ts",
+      'export const now = () => "2026-01-01T00:00:00Z";\n'
+    );
+    writeFile(
+      dir,
+      "src/presentation/controllers/order/order_controller.ts",
+      'import { y } from "../../../application/services/order/place_order.ts";\nexport const c = y;\n'
+    );
+    writeFile(dir, "src/presentation/views/order/order_view.ts", "export const v = 1;\n");
+    writeFile(dir, "src/presentation/i18n/en.ts", 'export const en = { title: "Order" };\n');
     const report = verifyProject(dir);
     assert.equal(report.ok, true, JSON.stringify(report.errors));
   } finally {
@@ -55,26 +77,49 @@ function writeFile(dir, rel, content) {
   }
 }
 
-// 2. Structure rules: loose file at layer root & aggregate cross-dependency fail
+// 2. Structure rules: loose layer file, loose pattern file, unauthorized pattern folder & aggregate isolation fail
 {
   const dir = makeFixture();
   try {
     writeFile(dir, "src/domain/loose.ts", "export const a = 1;\n");
-    writeFile(dir, "src/domain/customer/customer.ts", "export const c = 1;\n");
+    writeFile(dir, "src/domain/entities/loose.ts", "export const b = 1;\n");
+    writeFile(dir, "src/domain/helpers/order/util.ts", "export const h = 1;\n");
+    writeFile(dir, "src/domain/entities/customer/customer.ts", "export const c = 1;\n");
     writeFile(
       dir,
-      "src/domain/order/order.ts",
+      "src/domain/entities/order/order.ts",
       'import { c } from "../customer/customer.ts";\nexport const o = c;\n'
+    );
+    writeFile(
+      dir,
+      "src/domain/value_objects/order/quantity.ts",
+      'import { c } from "../../entities/customer/customer.ts";\nexport const q = c;\n'
     );
     const report = verifyProject(dir);
     assert.equal(report.ok, false);
     assert.ok(report.errors.some((e) => e.includes("[Loose Layer File]") && e.includes("src/domain/loose.ts")));
     assert.ok(
+      report.errors.some((e) => e.includes("[Loose Pattern File]") && e.includes("src/domain/entities/loose.ts"))
+    );
+    assert.ok(
+      report.errors.some(
+        (e) => e.includes("[Unauthorized Pattern Folder]") && e.includes("'helpers'") && e.includes("entities, value_objects, services, repositories, shared")
+      )
+    );
+    assert.ok(
       report.errors.some(
         (e) =>
           e.includes("[Aggregate Isolation Violation]") &&
-          e.includes("domain/order/") &&
-          e.includes("domain/customer/")
+          e.includes("domain/entities/order/") &&
+          e.includes("domain/entities/customer/")
+      )
+    );
+    assert.ok(
+      report.errors.some(
+        (e) =>
+          e.includes("[Aggregate Isolation Violation]") &&
+          e.includes("domain/value_objects/order/") &&
+          e.includes("domain/entities/customer/")
       )
     );
   } finally {
@@ -82,11 +127,13 @@ function writeFile(dir, rel, content) {
   }
 }
 
-// 3. Structure rules: module declaration files allowed; directory size warning does not fail
+// 3. Structure rules: module declaration files allowed at layer and pattern roots; directory size warning does not fail
 {
   const dir = makeFixture({ maxFiles: 3 });
   try {
     writeFile(dir, "src/domain/mod.rs", "pub mod shared;\n");
+    writeFile(dir, "src/domain/entities/mod.rs", "pub mod order;\n");
+    writeFile(dir, "src/domain/entities/order/mod.rs", "pub mod order;\n");
     writeFile(dir, "src/domain/shared/a.rs", "pub fn a() {}\n");
     writeFile(dir, "src/domain/shared/b.rs", "pub fn b() {}\n");
     writeFile(dir, "src/domain/shared/c.rs", "pub fn c() {}\n");
@@ -108,8 +155,8 @@ console.log("PASS: governance structure verification tests");
   const dir = makeFixture({ userLocale: "ja" });
   try {
     writeFile(dir, "src/domain/shared/result.ts", "export const ok = true;\n");
-    writeFile(dir, "src/presentation/web/i18n/en.ts", 'export const en = { title: "Order", submit: "Go" };\n');
-    writeFile(dir, "src/presentation/web/i18n/ja.ts", 'export const ja = { title: "注文" };\n');
+    writeFile(dir, "src/presentation/i18n/en.ts", 'export const en = { title: "Order", submit: "Go" };\n');
+    writeFile(dir, "src/presentation/i18n/ja.ts", 'export const ja = { title: "注文" };\n');
     writeFile(
       dir,
       "docs/domain/orphan.ja.md",
@@ -128,7 +175,7 @@ console.log("PASS: governance structure verification tests");
     writeFile(dir, "docs/domain/context-map.ja.md", "# CM (JA)\n");
     stampTranslationFile(dir, "docs/domain/ubiquitous-language.ja.md");
     stampTranslationFile(dir, "docs/domain/context-map.ja.md");
-    writeFile(dir, "src/presentation/web/i18n/ja.ts", 'export const ja = { title: "注文", submit: "送信" };\n');
+    writeFile(dir, "src/presentation/i18n/ja.ts", 'export const ja = { title: "注文", submit: "送信" };\n');
 
     const r2 = verifyProject(dir);
     assert.equal(r2.ok, true, JSON.stringify(r2.errors));
@@ -149,6 +196,39 @@ console.log("PASS: governance structure verification tests");
 }
 
 console.log("PASS: governance localization & i18n catalog verification tests");
+
+// 4b. UI catalogs are detected both directly under presentation/i18n/ and in <resource>/ subfolders
+{
+  const dir = makeFixture();
+  try {
+    writeFile(dir, "src/presentation/i18n/en.ts", 'export const en = { title: "Order" };\n');
+    writeFile(dir, "src/presentation/i18n/ja.ts", 'export const ja = { title: "注文" };\n');
+    writeFile(
+      dir,
+      "src/presentation/i18n/order/en.ts",
+      'export const en = { title: "Order", submit: "Go" };\n'
+    );
+    writeFile(
+      dir,
+      "src/presentation/i18n/order/ja.ts",
+      'export const ja = { title: "注文", submit: "送信" };\n'
+    );
+    assert.deepEqual(verifyUiCatalogs(dir, "ja"), []);
+
+    // Mismatch inside the resource subfolder catalog is reported
+    writeFile(
+      dir,
+      "src/presentation/i18n/order/ja.ts",
+      'export const ja = { title: "注文" };\n'
+    );
+    const errs = verifyUiCatalogs(dir, "ja");
+    assert.ok(errs.some((e) => e.includes("[I18n Catalog Mismatch]") && e.includes("order/ja.ts") && e.includes("submit")));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("PASS: governance presentation/i18n resource-subfolder catalog tests");
 
 // 5. Gradual migration & schema version warning: v1 warns and passes (exit 0), v2 errors (exit 1)
 {
@@ -236,7 +316,7 @@ The system SHALL place.
     );
     writeFile(
       dir,
-      "src/application/order/commands/place_order.ts",
+      "src/application/services/order/place_order.ts",
       "// @implements REQ-ORD-001\nexport function placeOrder() {}\n"
     );
     writeFile(
@@ -351,7 +431,7 @@ console.log("PASS: governance test-spec checklist & 4-language test ID tests");
     const ulPath = path.join(dir, "docs/domain/ubiquitous-language.ja.md");
     const ul = fs.readFileSync(ulPath, "utf8").replace("locale=ja", "locale=en");
     fs.writeFileSync(ulPath, ul);
-    writeFile(dir, "src/presentation/web/i18n/ja.ts", 'export const ja = { title: "注文" };\n');
+    writeFile(dir, "src/presentation/i18n/ja.ts", 'export const ja = { title: "注文" };\n');
 
     const r = verifyProject(dir);
     assert.equal(r.ok, false);
@@ -420,3 +500,81 @@ console.log("PASS: governance traceability context-code & scenario-parent checks
 }
 
 console.log("PASS: governance integration checklist IT-only case ID checks");
+
+// 11. Aggregate isolation across tactical-pattern folders is enforced for all 4 languages
+{
+  const dir = makeFixture();
+  try {
+    // TypeScript: same aggregate across patterns is allowed
+    writeFile(
+      dir,
+      "src/domain/value_objects/order/quantity.ts",
+      'import { x } from "../../entities/order/order.ts";\nexport const q = x;\n'
+    );
+    writeFile(
+      dir,
+      "src/domain/entities/order/order.ts",
+      'import { q } from "../../value_objects/order/quantity.ts";\nexport const o = q;\n'
+    );
+    // Python: cross-aggregate absolute import is a violation
+    writeFile(
+      dir,
+      "src/domain/entities/order/order.py",
+      "from src.domain.entities.customer.customer import Customer\nexport = Customer\n"
+    );
+    // Python: same aggregate across patterns is allowed
+    writeFile(
+      dir,
+      "src/domain/value_objects/order/money.py",
+      "from src.domain.entities.order.order import Order\n"
+    );
+    // Go: cross-aggregate import across pattern folders is a violation
+    writeFile(
+      dir,
+      "internal/domain/entities/order/order.go",
+      'package order\nimport "example.com/x/internal/domain/repositories/customer"\nvar _ = customer.New\n'
+    );
+    // Rust: cross-aggregate use across pattern folders is a violation
+    writeFile(
+      dir,
+      "src/domain/entities/order/order.rs",
+      "use crate::domain::value_objects::customer::CustomerId;\npub struct Order;\n"
+    );
+
+    const report = verifyProject(dir);
+    assert.equal(report.ok, false);
+    const isolation = report.errors.filter((e) => e.includes("[Aggregate Isolation Violation]"));
+    assert.ok(
+      isolation.some(
+        (e) =>
+          e.includes("src/domain/entities/order/order.py") &&
+          e.includes("domain/entities/order/") &&
+          e.includes("domain/entities/customer/")
+      ),
+      JSON.stringify(isolation)
+    );
+    assert.ok(
+      isolation.some(
+        (e) =>
+          e.includes("internal/domain/entities/order/order.go") &&
+          e.includes("domain/entities/order/") &&
+          e.includes("domain/repositories/customer/")
+      ),
+      JSON.stringify(isolation)
+    );
+    assert.ok(
+      isolation.some(
+        (e) =>
+          e.includes("src/domain/entities/order/order.rs") &&
+          e.includes("domain/entities/order/") &&
+          e.includes("domain/value_objects/customer/")
+      ),
+      JSON.stringify(isolation)
+    );
+    assert.equal(isolation.length, 3, JSON.stringify(isolation));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("PASS: governance multi-language aggregate isolation tests");

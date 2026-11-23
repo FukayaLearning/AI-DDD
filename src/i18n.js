@@ -209,6 +209,29 @@ export function extractCatalogKeys(code) {
   return keys;
 }
 
+const CATALOG_SOURCE_EXTENSIONS = new Set([".ts", ".mts", ".js", ".mjs", ".py", ".go", ".rs"]);
+const CATALOG_NON_LOCALE_FILES = new Set(["mod.rs", "__init__.py", "index.ts", "index.js"]);
+
+function collectCatalogDirs(root) {
+  const dirs = [];
+  const visit = (dir) => {
+    let hasLocaleFile = false;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        visit(path.join(dir, entry.name));
+      } else if (
+        !CATALOG_NON_LOCALE_FILES.has(entry.name) &&
+        CATALOG_SOURCE_EXTENSIONS.has(path.extname(entry.name))
+      ) {
+        hasLocaleFile = true;
+      }
+    }
+    if (hasLocaleFile) dirs.push(dir);
+  };
+  visit(root);
+  return dirs;
+}
+
 export function verifyUiCatalogs(absTarget, userLocale) {
   const errors = [];
   const candidates = [];
@@ -218,7 +241,8 @@ export function verifyUiCatalogs(absTarget, userLocale) {
       if (["node_modules", ".git", "target", "__pycache__", ".venv", "dist"].includes(e.name)) continue;
       const full = path.join(d, e.name);
       if (e.isDirectory()) {
-        if (e.name === "i18n" && /(^|\/)(src|internal)\/presentation\//.test(full.replace(/\\/g, "/") + "/")) {
+        // presentation/i18n/ (either catalogs directly under it or under <resource>/ subfolders)
+        if (e.name === "i18n" && /(^|\/)(src|internal)\/presentation\/i18n$/.test(full.replace(/\\/g, "/"))) {
           candidates.push(full);
         } else {
           walk(full);
@@ -228,43 +252,45 @@ export function verifyUiCatalogs(absTarget, userLocale) {
   };
   walk(absTarget);
 
-  for (const i18nDir of candidates) {
-    const localeFiles = new Map();
-    for (const entry of fs.readdirSync(i18nDir, { withFileTypes: true })) {
-      if (!entry.isFile()) continue;
-      if (["mod.rs", "__init__.py", "index.ts", "index.js"].includes(entry.name)) continue;
-      const ext = path.extname(entry.name);
-      if (![".ts", ".mts", ".js", ".mjs", ".py", ".go", ".rs"].includes(ext)) continue;
-      const base = path.basename(entry.name, ext);
-      localeFiles.set(base, path.join(i18nDir, entry.name));
-    }
-    if (localeFiles.size === 0) continue;
-
-    if (userLocale && userLocale !== "en" && !localeFiles.has(userLocale)) {
-      const relDir = path.relative(absTarget, i18nDir).replace(/\\/g, "/");
-      errors.push(`[Missing UI Catalog] ${relDir}: missing catalog for user locale '${userLocale}'`);
-    }
-
-    const enFile = localeFiles.get("en");
-    if (!enFile) {
-      const relDir = path.relative(absTarget, i18nDir).replace(/\\/g, "/");
-      errors.push(`[Missing UI Catalog] ${relDir}: master 'en' catalog is required`);
-      continue;
-    }
-    const enKeys = extractCatalogKeys(fs.readFileSync(enFile, "utf8"));
-
-    for (const [loc, filePath] of localeFiles.entries()) {
-      if (loc === "en") continue;
-      const locKeys = extractCatalogKeys(fs.readFileSync(filePath, "utf8"));
-      const relFile = path.relative(absTarget, filePath).replace(/\\/g, "/");
-      for (const k of enKeys) {
-        if (!locKeys.has(k)) {
-          errors.push(`[I18n Catalog Mismatch] ${relFile}: missing key '${k}' present in 'en' catalog`);
-        }
+  for (const i18nRoot of candidates) {
+    for (const i18nDir of collectCatalogDirs(i18nRoot)) {
+      const localeFiles = new Map();
+      for (const entry of fs.readdirSync(i18nDir, { withFileTypes: true })) {
+        if (!entry.isFile()) continue;
+        if (CATALOG_NON_LOCALE_FILES.has(entry.name)) continue;
+        const ext = path.extname(entry.name);
+        if (!CATALOG_SOURCE_EXTENSIONS.has(ext)) continue;
+        const base = path.basename(entry.name, ext);
+        localeFiles.set(base, path.join(i18nDir, entry.name));
       }
-      for (const k of locKeys) {
-        if (!enKeys.has(k)) {
-          errors.push(`[I18n Catalog Mismatch] ${relFile}: extra key '${k}' not present in 'en' catalog`);
+      if (localeFiles.size === 0) continue;
+
+      if (userLocale && userLocale !== "en" && !localeFiles.has(userLocale)) {
+        const relDir = path.relative(absTarget, i18nDir).replace(/\\/g, "/");
+        errors.push(`[Missing UI Catalog] ${relDir}: missing catalog for user locale '${userLocale}'`);
+      }
+
+      const enFile = localeFiles.get("en");
+      if (!enFile) {
+        const relDir = path.relative(absTarget, i18nDir).replace(/\\/g, "/");
+        errors.push(`[Missing UI Catalog] ${relDir}: master 'en' catalog is required`);
+        continue;
+      }
+      const enKeys = extractCatalogKeys(fs.readFileSync(enFile, "utf8"));
+
+      for (const [loc, filePath] of localeFiles.entries()) {
+        if (loc === "en") continue;
+        const locKeys = extractCatalogKeys(fs.readFileSync(filePath, "utf8"));
+        const relFile = path.relative(absTarget, filePath).replace(/\\/g, "/");
+        for (const k of enKeys) {
+          if (!locKeys.has(k)) {
+            errors.push(`[I18n Catalog Mismatch] ${relFile}: missing key '${k}' present in 'en' catalog`);
+          }
+        }
+        for (const k of locKeys) {
+          if (!enKeys.has(k)) {
+            errors.push(`[I18n Catalog Mismatch] ${relFile}: extra key '${k}' not present in 'en' catalog`);
+          }
         }
       }
     }
