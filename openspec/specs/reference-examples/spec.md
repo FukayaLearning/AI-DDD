@@ -30,12 +30,12 @@ Each example SHALL test its HTML SSR Web UI by launching the real HTTP presentat
 - **THEN** rendered DOM elements display the expected order state, totals, disabled/enabled action controls, and error banners, covering 100% of Presentation branches
 
 ### Requirement: Examples demonstrate module layout and traceability
-各リファレンスサンプルは Ordering Bounded Context をモジュール細分化構造（`domain/shared`・`domain/order`・`application/order/commands|queries`・`infrastructure/drivers|persistence|acl`・`presentation/web/order`）で実装し、仕様見出し・試験仕様書・テスト名・ユースケース実装に ID を付与 SHALL する。`ai-ddd verify` と `ai-ddd trace --check` が成功 MUST する。
+各リファレンスサンプルは Ordering Bounded Context を戦術的パターン別×集約細分化構造（`domain/shared`・`domain/entities/order`・`domain/value_objects/{shared,order}`・`domain/repositories/order`・`application/{services,ports,dtos}/{order,shared}`・`infrastructure/repositories/order`・`infrastructure/gateways/{inventory,payment}`・`infrastructure/mappers/{order,inventory,payment}`・`infrastructure/drivers/{kv,http}`・`presentation/{controllers,views,i18n}`）で実装し、仕様見出し・試験仕様書・テスト名・ユースケース実装に ID を付与 SHALL する。`ai-ddd verify` と `ai-ddd trace --check` が成功 MUST する。
 
 #### Scenario: Traceability matrix is complete for every example
 - **GIVEN** `examples/{typescript,python,go,rust}/` の各サンプル
-- **WHEN** `ai-ddd trace --target <example> --check` を実行する
-- **THEN** 全 `REQ` と `SCN` に実装・単体テスト・結合テストが対応し、終了コード 0 で終了する
+- **WHEN** `ai-ddd trace --target <example> --check` および `ai-ddd verify --target <example>` を実行する
+- **THEN** 全 `REQ` と `SCN` に戦術的パターン別フォルダ配下の実装・単体テスト・結合テストが対応し、構造違反ゼロで終了コード 0 で終了する
 
 ### Requirement: Examples provide test specifications and abnormal-path integration tests
 各サンプルは `docs/testing/integration/order-management.md` と層別の単体テスト仕様書を持ち、結合テストは正常系に加え、入力不正、不正状態遷移、在庫不足、決済拒否、外部サービスのタイムアウト・利用不可、永続化障害、対象未存在を配布形態の実行物に対して検証 SHALL する。
