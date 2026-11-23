@@ -1,6 +1,6 @@
 name: ddd-driven
-version: 2
-description: OpenSpec + DDD 5-stage workflow (proposal -> specs -> design -> test-plan -> tasks) with 1-repo-1-Bounded-Context, Result<T, E>, 3-part Infrastructure, Mock+Playwright C1 100% coverage, and 3-role multi-agent orchestration.
+version: 3
+description: OpenSpec + DDD 5-stage workflow (proposal -> specs -> design -> test-plan -> tasks) with 1-repo-1-Bounded-Context, tactical-pattern x aggregate folder layout, Result<T, E>, 3-part Infrastructure, Mock+Playwright C1 100% coverage, and 3-role multi-agent orchestration.
 artifacts:
   - id: proposal
     generates: proposal.md
@@ -68,14 +68,14 @@ artifacts:
       2. **Tactical Domain Model & Result<T, E>**:
          - Specify Value Objects, Entities, Aggregate Roots (invariants), Domain Events, Domain Services, and Repository/ACL Ports.
          - Model ALL expected domain and infrastructure failures using `Result<T, E>` (no throwing domain exceptions for business or I/O errors), so every error path is an explicit C1 branch.
-      3. **Layer-First 4-Layer Architecture**:
-         - `domain`: Zero dependencies on outer layers or I/O libraries.
-         - `application`: UseCases taking Repository/ACL ports via DI, returning `Result<T, E>`. Depends only on `domain`.
+      3. **Layer-First 4-Layer Architecture (Tactical Pattern x Aggregate)**:
+         - `domain`: Zero dependencies on outer layers or I/O libraries. Split into `domain/shared/` (`Result<T, E>`, base `DomainError` only) and `domain/{entities,value_objects,services,repositories}/<aggregate>/`; cross-aggregate identifiers/shared VOs live in `domain/value_objects/shared/`.
+         - `application`: UseCases taking Repository/ACL ports via DI, returning `Result<T, E>`. Depends only on `domain`. Split into `application/{services,ports,dtos}/<aggregate|shared>/`.
          - `infrastructure`: MUST be separated into 3 distinct parts:
-           a) **Pure Mapper / ACL Converters**: Side-effect free, 100% C1 unit-testable without mocks.
-           b) **Minimal I/O Drivers (`infrastructure/drivers/`)**: Raw DB/HTTP calls ONLY. **FORBIDDEN to contain `if`/`switch`/`match`/ternary business or error-classification branches.**
-           c) **Repository / Gateway Implementations**: Inject `drivers/` interfaces via DI, map raw driver responses/errors (timeout, conflict, unavailable) to `Result<T, E>`, achieving 100% C1 unit-test coverage via mock drivers.
-         - `presentation`: Web UI / HTTP SSR handlers taking Application UseCases via DI (never directly importing `infrastructure`). Tested via **Mock UseCase + Playwright/Headless Chromium** covering all rendering/form/error branches to directly measure Presentation C1 coverage.
+           a) **Pure Mapper / ACL Converters (`infrastructure/mappers/<aggregate|external-context>/`)**: Side-effect free, 100% C1 unit-testable without mocks.
+           b) **Minimal I/O Drivers (`infrastructure/drivers/<technology>/`)**: Raw DB/HTTP calls ONLY. **FORBIDDEN to contain `if`/`switch`/`match`/ternary business or error-classification branches.**
+           c) **Repository / Gateway Implementations (`infrastructure/repositories/<aggregate>/`, `infrastructure/gateways/<external-context>/`)**: Inject `drivers/` interfaces via DI, map raw driver responses/errors (timeout, conflict, unavailable) to `Result<T, E>`, achieving 100% C1 unit-test coverage via mock drivers.
+         - `presentation`: Web UI / HTTP SSR handlers taking Application UseCases via DI (never directly importing `infrastructure`). Split into `presentation/controllers/<resource>/` (routing/request interpretation/UseCase invocation), `presentation/views/<resource>/` (HTML SSR rendering), and `presentation/i18n/` (message catalogs). Tested via **Mock UseCase + Playwright/Headless Chromium** covering all rendering/form/error branches to directly measure Presentation C1 coverage.
          - `main`: Composition root wiring real drivers, repositories, use cases, and presentation handlers.
       4. **Unit-Test Exclusions & C1 100% Governance**:
          - ONLY `infrastructure/drivers/` and `main` may be excluded from unit-test C1 coverage (configured centrally in one config file; inline ignore comments like `v8 ignore`, `istanbul ignore`, `pragma: no cover`, `#[coverage(off)]` are strictly forbidden).
@@ -83,8 +83,9 @@ artifacts:
          - Everything outside exclusions MUST achieve **100% C1 (branch) coverage**.
       5. **Distribution & Integration Test Plan**:
          - State distribution target (`docker`, `binary`, or `library`) and how excluded `infrastructure/drivers/` and `main` are verified in integration tests.
-      6. **Module-Subdivided Layer Layout & Localization**:
-         - Subdivide layers into `domain/{shared,<agg>}`, `application/{shared,<agg>/{commands,queries}}`, `infrastructure/{drivers/<tech>,persistence/<agg>,acl/<ext>}`, `presentation/<channel>/{shared,<res>,i18n}`.
+      6. **Tactical-Pattern x Aggregate Layer Layout & Localization**:
+         - Use the uniform 3-level layout `<layer>/<tactical-pattern>/<aggregate-or-module>/`: `domain/shared/` + `domain/{entities,value_objects,services,repositories}/<aggregate>/` (with `domain/value_objects/shared/`), `application/{services,ports,dtos}/<aggregate|shared>/`, `infrastructure/{repositories/<agg>,gateways/<ext>,mappers/<agg|ext>,drivers/<tech>}/`, `presentation/{controllers,views,i18n}/<resource|shared>/`.
+         - No loose source files at layer roots or directly under a tactical pattern folder (except `domain/shared/` and `presentation/i18n/`); module declaration files (`mod.rs`, `lib.rs`, `__init__.py`) are exempt.
          - If `locale.user` != `en`, translate `design.md` to `i18n/<locale>/design.md` and stamp it.
     requires:
       - proposal

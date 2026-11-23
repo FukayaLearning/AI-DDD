@@ -11,22 +11,22 @@
 - **Value Objects**: <!-- Immutable validated types returning Result<T, DomainError> -->
 - **Entities & Aggregate Roots**: <!-- Aggregate boundary, invariants, state transitions -->
 - **Domain Events**: <!-- Events emitted on aggregate state changes -->
-- **Domain & Application Ports (Interfaces)**: <!-- OrderRepository owned by domain/<aggregate>/; external ACL Ports owned by application/shared/ -->
+- **Domain & Application Ports (Interfaces)**: <!-- OrderRepository owned by domain/repositories/<aggregate>/; external ACL Ports owned by application/ports/<external-or-shared>/ -->
 - **Error Modeling (`Result<T, E>`)**: <!-- Exhaustive DomainError variants (no domain exceptions) -->
 
 ## 4-Layer Architecture, Module Layout & Infrastructure 3-Part Separation
 
 - **Dependency Rule**: `presentation -> application -> domain <- infrastructure`; `presentation` MUST NOT import `infrastructure`; `main` wires DI.
-- **Module-Subdivided Layer Layout** (no loose source files at layer roots; aggregate isolation inside `domain/`):
-  - `domain/shared/` (Shared Kernel: `Result`, base `DomainError`, shared VOs/IDs) & `domain/<aggregate>/`
-  - `application/shared/` (ACL ports, shared DTOs) & `application/<aggregate>/{commands,queries}/`
-  - `infrastructure/drivers/<technology>/`, `infrastructure/persistence/<aggregate>/`, `infrastructure/acl/<external-context>/`
-  - `presentation/<channel>/shared/`, `presentation/<channel>/<resource>/`, `presentation/<channel>/i18n/`
+- **Tactical-Pattern x Aggregate Layer Layout** (uniform 3-level `<layer>/<tactical-pattern>/<aggregate-or-module>/`; no loose source files at layer roots or directly under pattern folders; aggregate isolation inside `domain/`):
+  - `domain/shared/` (Shared Kernel: `Result`, base `DomainError` only) & `domain/{entities,value_objects,services,repositories}/<aggregate>/` (shared VOs/IDs in `domain/value_objects/shared/`)
+  - `application/{services,ports,dtos}/<aggregate|shared>/`
+  - `infrastructure/repositories/<aggregate>/`, `infrastructure/gateways/<external-context>/`, `infrastructure/mappers/<aggregate|external-context>/`, `infrastructure/drivers/<technology>/`
+  - `presentation/controllers/<resource>/`, `presentation/views/<resource>/`, `presentation/i18n/` (`en` + user locale catalogs)
 - **Infrastructure Split**:
-  1. **Pure Mappers & ACL Converters**: Side-effect free transformations (100% C1 unit-testable without mocks).
+  1. **Pure Mappers & ACL Converters (`infrastructure/mappers/`)**: Side-effect free transformations (100% C1 unit-testable without mocks).
   2. **Minimal Drivers (`infrastructure/drivers/`)**: Raw DB/HTTP I/O ONLY. Zero `if`/`switch`/`match`/ternary business or error-mapping branches allowed.
-  3. **Repositories & Gateways**: Accept driver interfaces via DI, convert driver failures/timeouts/conflicts into `Result<T, E>` (100% C1 unit-testable via mock drivers).
-- **Presentation (`presentation/`)**: Web UI / SSR handlers accepting Application UseCases via DI; verified via Mock UseCase + Playwright/Headless Chromium for 100% C1 coverage.
+  3. **Repositories (`infrastructure/repositories/`) & Gateways (`infrastructure/gateways/`)**: Accept driver interfaces via DI, convert driver failures/timeouts/conflicts into `Result<T, E>` (100% C1 unit-testable via mock drivers).
+- **Presentation (`presentation/`)**: `controllers/` (HTTP routing, request interpretation, UseCase invocation) and `views/` (HTML SSR rendering) accept Application UseCases via DI; verified via Mock UseCase + Playwright/Headless Chromium for 100% C1 coverage.
 
 ## Unit-Test Exclusions & C1 100% Coverage Governance
 

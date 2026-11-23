@@ -1,6 +1,6 @@
 ---
 name: ddd-workflow
-description: End-to-end OpenSpec + DDD development workflow enforcing 1-repo-1-Bounded-Context, 5-stage schema (with test-plan), module-subdivided 4-layer architecture, Result<T, E>, 3-part Infrastructure, Mock x Playwright Web UI C1 100% coverage, traceability, localization, and 3-role multi-agent orchestration.
+description: End-to-end OpenSpec + DDD development workflow enforcing 1-repo-1-Bounded-Context, 5-stage schema (with test-plan), tactical-pattern x aggregate 4-layer architecture, Result<T, E>, 3-part Infrastructure, Mock x Playwright Web UI C1 100% coverage, traceability, localization, and 3-role multi-agent orchestration.
 ---
 
 # OpenSpec × DDD Workflow Skill
@@ -13,16 +13,16 @@ Use this skill whenever designing, implementing, testing, or verifying changes i
    - External Bounded Contexts live in separate repositories (cross-repo OpenSpec linking is `T.B.D.`).
    - Keep `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md` synchronized on every change.
    - Store specifications under `openspec/specs/<bounded-context>/<capability>/spec.md`.
-2. **Module-Subdivided 4-Layer Architecture**:
-   - **No loose source files at layer roots** (except language module declarations like `mod.rs`, `__init__.py`, `lib.rs`).
-   - `domain/`: Zero outer-layer or I/O dependencies. Split into `domain/shared/` (Shared Kernel: `Result<T, E>`, base `DomainError`, shared VOs/IDs) and `domain/<aggregate>/`. **Aggregates MUST NOT directly depend on other aggregates**; reference across aggregates via IDs in `domain/shared/`.
-   - `application/`: Split into `application/shared/` (ACL ports, shared DTOs) and `application/<aggregate>/{commands,queries}/`. UseCases accept Ports via DI, return `Result<T, E>`, and declare `@implements REQ-<CTX>-<NNN>`.
+2. **Tactical-Pattern x Aggregate 4-Layer Architecture**:
+   - Use the uniform 3-level layout `<layer>/<tactical-pattern>/<aggregate-or-module>/`. **No loose source files at layer roots or directly under a tactical pattern folder** (except `domain/shared/` and `presentation/i18n/`; language module declarations like `mod.rs`, `__init__.py`, `lib.rs` are exempt).
+   - `domain/`: Zero outer-layer or I/O dependencies. Split into `domain/shared/` (Shared Kernel: `Result<T, E>`, base `DomainError` only) and `domain/{entities,value_objects,services,repositories}/<aggregate>/` (cross-aggregate IDs/shared VOs in `domain/value_objects/shared/`). **Aggregates MUST NOT directly depend on other aggregates**; reference across aggregates via IDs in `domain/value_objects/shared/`.
+   - `application/`: Split into `application/{services,ports,dtos}/<aggregate|shared>/` (`ports/` also holds external-context ports). UseCases accept Ports via DI, return `Result<T, E>`, and declare `@implements REQ-<CTX>-<NNN>`.
    - `infrastructure/`: Split strictly into:
      1. `infrastructure/drivers/<technology>/`: Raw I/O only (**NO `if`/`switch`/`match`/ternary logic allowed**).
-     2. `infrastructure/persistence/<aggregate>/`: Pure Mappers + DI Repositories.
-     3. `infrastructure/acl/<external-context>/`: Pure ACL translators + DI Gateways.
-   - `presentation/`: Split into `presentation/<channel>/shared/`, `presentation/<channel>/<resource>/`, and `presentation/<channel>/i18n/` (MUST NOT import `infrastructure`).
-   - `main`: Composition root wiring locale config, real drivers, repositories, use cases, and presentation.
+     2. `infrastructure/mappers/<aggregate|external-context>/`: Pure Mappers / ACL converters (side-effect free).
+     3. `infrastructure/repositories/<aggregate>/` and `infrastructure/gateways/<external-context>/`: DI Repositories / Gateways mapping driver results to `Result<T, E>`.
+   - `presentation/`: Split into `presentation/controllers/<resource>/` (routing, request interpretation, UseCase invocation), `presentation/views/<resource>/` (HTML SSR rendering), and `presentation/i18n/` (`en` + user locale catalogs) (MUST NOT import `infrastructure`).
+   - `main`: Composition root wiring locale config, real drivers, repositories, gateways, use cases, and presentation.
    - Keep directory file counts <= `structure.maxFilesPerDirectory` (default 15; `ai-ddd verify` warns when exceeded).
 3. **Result<T, E> Error Handling**:
    - Model all expected domain and infrastructure failures as typed error values inside `Result<T, E>`. Reserve exceptions/panics solely for unrecoverable bugs.
@@ -38,7 +38,7 @@ Use this skill whenever designing, implementing, testing, or verifying changes i
    - After creating or updating any translation, run `ai-ddd i18n stamp --target <dir> <translation-file>` so the `<!-- ai-ddd-translation: source=<name> sha256=<hash> locale=<locale> -->` header matches the master.
    - **Translation Sync at Archive**: When archiving a change via `openspec-archive-change`, sync `i18n/<locale>/specs/**` into the corresponding `openspec/specs/**/<basename>.<locale>.md` and re-stamp.
 3. **Web UI Localization**:
-   - Store all UI text and `DomainError` display messages in `presentation/<channel>/i18n/` (`en` + `locale.user`), inject the active catalog from `main` (overridable via `APP_LOCALE`), and set `<html lang="<locale>">`.
+   - Store all UI text and `DomainError` display messages in `presentation/i18n/` (`en` + `locale.user` catalogs directly under it or in `<resource>/` subfolders), inject the active catalog from `main` (overridable via `APP_LOCALE`), and set `<html lang="<locale>">`.
 
 ## 3. Traceability & ID Numbering
 

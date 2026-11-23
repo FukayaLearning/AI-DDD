@@ -4,21 +4,21 @@
 
 - [ ] 1.1 Update `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md` and verify terminology matches proposal/specs
 - [ ] 1.2 Create or update `docs/testing/unit/<layer>/<module>.md` and `docs/testing/integration/<capability>.md` with `UT-`/`IT-` IDs, techniques, expected results, rationales, and the 7-category abnormal-path checklist
-- [ ] 1.3 Write Domain unit tests (each named with its `UT-` ID) for Value Objects, Aggregate invariants, `Result` error branches, and Domain Events, then implement `domain/` to 100% C1 branch coverage
+- [ ] 1.3 Write Domain unit tests (each named with its `UT-` ID) for Value Objects, Aggregate invariants, Domain Services, `Result` error branches, and Domain Events, then implement `domain/{entities,value_objects,services,repositories}/<aggregate>/` to 100% C1 branch coverage
 
 ## 2. Infrastructure Layer 3-Part TDD (100% C1 outside `drivers/`)
 
-- [ ] 2.1 Write unit tests (with `UT-` IDs) for pure Mappers and ACL converters, then implement them to 100% C1 branch coverage
+- [ ] 2.1 Write unit tests (with `UT-` IDs) for pure Mappers (`infrastructure/mappers/<aggregate|external-context>/`) and ACL converters, then implement them to 100% C1 branch coverage
 - [ ] 2.2 Define minimal branchless `infrastructure/drivers/<technology>/` interfaces and raw driver implementations (verify zero `if`/`switch`/`match` branches)
-- [ ] 2.3 Write unit tests (with `UT-` IDs) using mock drivers for all abnormal paths (timeouts, conflicts, HTTP errors, storage failures) and implement Repositories/Gateways to 100% C1 branch coverage
+- [ ] 2.3 Write unit tests (with `UT-` IDs) using mock drivers for all abnormal paths (timeouts, conflicts, HTTP errors, storage failures) and implement `infrastructure/repositories/<aggregate>/` and `infrastructure/gateways/<external-context>/` to 100% C1 branch coverage
 
 ## 3. Application Layer Scenario TDD (100% C1)
 
-- [ ] 3.1 Write Application UseCase tests (with `UT-` IDs) mapped 1-to-1 to every OpenSpec `#### Scenario:` using DI mock ports, then implement `application/` (`@implements REQ-...`) to 100% C1 branch coverage
+- [ ] 3.1 Write Application UseCase tests (with `UT-` IDs) mapped 1-to-1 to every OpenSpec `#### Scenario:` using DI mock ports, then implement `application/{services,ports,dtos}/<aggregate|shared>/` (`@implements REQ-...`) to 100% C1 branch coverage
 
 ## 4. Presentation Layer Mock x Playwright Web UI TDD (100% C1)
 
-- [ ] 4.1 Launch Presentation Web server with DI-injected Mock UseCases and localized message catalogs (`en` + user locale) under coverage instrumentation, and run headless browser (Playwright/Chromium) tests (with `UT-` IDs) across all normal, validation-error, domain-error, system-error, locale, and 404 paths until 100% Presentation C1 coverage passes
+- [ ] 4.1 Launch Presentation Web server (`presentation/controllers/<resource>/`) with DI-injected Mock UseCases and localized message catalogs (`presentation/i18n/`; `en` + user locale) under coverage instrumentation, and run headless browser (Playwright/Chromium) tests (with `UT-` IDs) across all normal, validation-error, domain-error, system-error, locale, and 404 paths until 100% Presentation C1 coverage (`controllers/` + `views/`) passes
 
 ## 5. Governance, Traceability, Distribution & Localization Verification
 

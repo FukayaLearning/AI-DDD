@@ -2,7 +2,7 @@
 
 ## 1. スキーマ・テンプレート・スキルの戦術的パターン別フォルダ構成への更新
 
-- [ ] 1.1 `schemas/ddd-driven/schema.yaml`（`version: 3` へ更新）および `schemas/ddd-driven/templates/{design,tasks,test-plan}.md`、`skills/ddd-workflow/SKILL.md`（および配布先スキルコピー）の 4 層フォルダ構成規約を `domain/{entities,value_objects,services,repositories,shared}`・`application/{services,ports,dtos}`・`infrastructure/{repositories,gateways,mappers,drivers}`・`presentation/{controllers,views,i18n}` に更新し、`openspec schema validate ddd-driven` が成功することを確認する
+- [x] 1.1 `schemas/ddd-driven/schema.yaml`（`version: 3` へ更新）および `schemas/ddd-driven/templates/{design,tasks,test-plan}.md`、`skills/ddd-workflow/SKILL.md`（および配布先スキルコピー）の 4 層フォルダ構成規約を `domain/{entities,value_objects,services,repositories,shared}`・`application/{services,ports,dtos}`・`infrastructure/{repositories,gateways,mappers,drivers}`・`presentation/{controllers,views,i18n}` に更新し、`openspec schema validate ddd-driven` が成功することを確認する
 
 ## 2. `ai-ddd verify` 静的構造検証と単体テストの更新
 

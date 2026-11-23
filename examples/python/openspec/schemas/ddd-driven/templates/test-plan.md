@@ -10,10 +10,10 @@
 ## Test Levels & Responsibilities
 
 - **Unit Tests (`UT-<CTX>-<NNN>`)**:
-  - `domain/`: Value Objects, Aggregate invariants, `Result<T, E>` error branches, Domain Events
-  - `infrastructure/persistence/`, `infrastructure/acl/`: Pure Mappers & Repositories/Gateways via mock drivers
-  - `application/`: UseCases via mock ports (1-to-1 with Scenarios)
-  - `presentation/`: Mock UseCase + Headless Chromium / Playwright UI & locale branches
+  - `domain/{entities,value_objects,services,repositories}/<aggregate>/`: Value Objects, Aggregate invariants, Domain Services, `Result<T, E>` error branches, Domain Events
+  - `infrastructure/mappers/`, `infrastructure/repositories/`, `infrastructure/gateways/`: Pure Mappers & Repositories/Gateways via mock drivers
+  - `application/{services,ports,dtos}/`: UseCases via mock ports (1-to-1 with Scenarios)
+  - `presentation/{controllers,views,i18n}/`: Mock UseCase + Headless Chromium / Playwright UI & locale branches
 - **Integration / E2E Tests (`IT-<CTX>-<NNN>`)**:
   - Executed against real distribution artifact (`docker` | `binary` | `library`) verifying `infrastructure/drivers/` and `main` wiring, normal Scenarios, and abnormal paths.
 
