@@ -1,15 +1,15 @@
 import os
 import pathlib
 from http.server import ThreadingHTTPServer
-from src.application.order.commands.order_service import OrderApplicationService
-from src.infrastructure.acl.inventory.inventory_gateway import InventoryGateway
-from src.infrastructure.acl.payment.payment_gateway import PaymentGateway
+from src.application.services.order.order_service import OrderApplicationService
+from src.infrastructure.gateways.inventory.inventory_gateway import InventoryGateway
+from src.infrastructure.gateways.payment.payment_gateway import PaymentGateway
 from src.infrastructure.drivers.http.http_driver import UrllibHttpJsonDriver
 from src.infrastructure.drivers.kv.kv_driver import FileKvDriver
-from src.infrastructure.persistence.order.driver_order_repository import DriverOrderRepository
-from src.presentation.web.i18n.en import MESSAGES as EN_MESSAGES
-from src.presentation.web.i18n.ja import MESSAGES as JA_MESSAGES
-from src.presentation.web.order.order_web_server import make_handler
+from src.infrastructure.repositories.order.driver_order_repository import DriverOrderRepository
+from src.presentation.i18n.en import MESSAGES as EN_MESSAGES
+from src.presentation.i18n.ja import MESSAGES as JA_MESSAGES
+from src.presentation.controllers.order.order_controller import make_handler
 
 
 def create_ordering_app(

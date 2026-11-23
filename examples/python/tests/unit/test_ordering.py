@@ -5,25 +5,24 @@ import unittest
 import urllib.error
 import urllib.request
 
-from src.application.order.commands.order_service import OrderApplicationService, PlaceOrderCommand, PlaceOrderLineInput
+from src.application.services.order.order_service import OrderApplicationService
+from src.application.dtos.order.order_dto import PlaceOrderCommand, PlaceOrderLineInput
 from src.domain.shared.errors import DomainError
-from src.domain.order.order import Order, OrderLine
+from src.domain.entities.order.order import Order, OrderLine
 from src.domain.shared.result import Err, Ok
-from src.domain.shared.value_objects import (
-    add_money,
+from src.domain.value_objects.shared.identifiers import (
     create_customer_id,
-    create_money,
     create_order_id,
     create_product_id,
-    create_quantity,
-    multiply_money,
 )
-from src.infrastructure.acl.inventory.inventory_gateway import InventoryGateway
-from src.infrastructure.acl.payment.payment_gateway import PaymentGateway
+from src.domain.value_objects.shared.money import add_money, create_money, multiply_money
+from src.domain.value_objects.order.quantity import create_quantity
+from src.infrastructure.gateways.inventory.inventory_gateway import InventoryGateway
+from src.infrastructure.gateways.payment.payment_gateway import PaymentGateway
 from src.infrastructure.drivers.http.http_driver import RawHttpResponse
-from src.infrastructure.persistence.order.driver_order_repository import DriverOrderRepository
-from src.infrastructure.persistence.order.order_mapper import from_order_record, to_order_record
-from src.presentation.web.order.order_web_server import run_order_web_server
+from src.infrastructure.repositories.order.driver_order_repository import DriverOrderRepository
+from src.infrastructure.mappers.order.order_mapper import from_order_record, to_order_record
+from src.presentation.controllers.order.order_controller import run_order_web_server
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 
@@ -257,7 +256,7 @@ class TestPythonOrderingDDD(unittest.TestCase):
 
     def test_presentation_browser_all_branches(self) -> None:
         """UT-ORD-027 UT-ORD-028 UT-ORD-029 UT-ORD-030 UT-ORD-031"""
-        from src.application.order.commands.order_service import OrderLineDto, OrderSummaryDto
+        from src.application.dtos.order.order_dto import OrderLineDto, OrderSummaryDto
 
         dto_draft = OrderSummaryDto(
             order_id="ORD-WEB-1",
@@ -459,7 +458,7 @@ class TestPythonOrderingDDD(unittest.TestCase):
                 urllib.request.urlopen(urllib.request.Request(f"{base_url}/", method="PUT"))
             self.assertEqual(cm4.exception.code, 404)
 
-        from src.presentation.web.i18n.ja import MESSAGES as JA_MESSAGES
+        from src.presentation.i18n.ja import MESSAGES as JA_MESSAGES
 
         uc.get_res = Ok(dto_draft)
         with run_order_web_server(uc, 0, JA_MESSAGES) as ja_url:

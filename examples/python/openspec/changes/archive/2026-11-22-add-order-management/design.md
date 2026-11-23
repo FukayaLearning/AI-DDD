@@ -8,19 +8,19 @@
 
 ## Tactical Domain Model (`src/domain/`)
 
-- **Value Objects**: `OrderId`, `CustomerId`, `ProductId`, `Money` (`JPY` | `USD`, `add`, `multiply`), `Quantity` (1..100).
-- **Entities & Aggregate Roots**: `OrderLine`, `Order` (`Draft` | `Confirmed` | `Cancelled`).
-- **Domain Events**: `OrderConfirmedEvent`, `OrderCancelledEvent`.
-- **Domain Ports**: `OrderRepository`, `InventoryPort`, `PaymentPort`.
+- **Value Objects**: `OrderId`, `CustomerId`, `ProductId`, `Money` (`JPY` | `USD`, `add`, `multiply`) in `src/domain/value_objects/shared/`; `Quantity` (1..100) in `src/domain/value_objects/order/`.
+- **Entities & Aggregate Roots**: `OrderLine`, `Order` (`Draft` | `Confirmed` | `Cancelled`) in `src/domain/entities/order/`.
+- **Domain Events**: `OrderConfirmedEvent`, `OrderCancelledEvent` in `src/domain/entities/order/`.
+- **Domain Ports**: `OrderRepository` in `src/domain/repositories/order/`; `InventoryPort` and `PaymentPort` in `src/application/ports/{inventory,payment}/`.
 - **Error Modeling (`Result[T, E]`)**: Frozen `Ok[T]` / `Err[DomainError]` dataclasses.
 
 ## 4-Layer Architecture & Infrastructure 3-Part Separation
 
 - **Dependency Rule**: `presentation -> application -> domain <- infrastructure`; `presentation` never imports `infrastructure`.
 - **Infrastructure Split**:
-  1. Pure `order_mapper.py` transformations.
-  2. Branchless `src/infrastructure/drivers/kv_driver.py` and `http_driver.py` (raw I/O only).
-  3. `DriverOrderRepository`, `InventoryGateway`, `PaymentGateway` tested to 100% C1 with mock drivers.
+  1. Pure `src/infrastructure/mappers/order/order_mapper.py` transformations.
+  2. Branchless `src/infrastructure/drivers/kv/` and `src/infrastructure/drivers/http/` (raw I/O only).
+  3. `src/infrastructure/repositories/order/DriverOrderRepository` and `src/infrastructure/gateways/{inventory,payment}/` tested to 100% C1 with mock drivers.
 
 ## Unit-Test Exclusions & C1 100% Coverage Governance
 

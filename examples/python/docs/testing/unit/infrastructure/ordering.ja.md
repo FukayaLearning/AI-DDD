@@ -1,6 +1,6 @@
-<!-- ai-ddd-translation: source=ordering.md sha256=b7762ccf57c7aa913e0ffe09223cba17e0589216e0086e9cf9f6ad9e7cfa4b3f locale=ja -->
+<!-- ai-ddd-translation: source=ordering.md sha256=4ce3a8c33e21c6e3226c214e5d1d9a711933af537b8073966e447d39a834ac22 locale=ja -->
 
-# 単体試験仕様書 — infrastructure
+# 単体試験仕様書 — infrastructure/mappers/order, infrastructure/repositories/order, infrastructure/gateways/{inventory,payment}
 
 | ID | 設計要素 | 試験技法 | 入力 | 期待結果 | 根拠 | 自動試験 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |

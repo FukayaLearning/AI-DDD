@@ -1,4 +1,4 @@
-# Unit Test Specification — domain/order
+# Unit Test Specification — domain/entities/order, domain/value_objects/shared, domain/value_objects/order
 
 | ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |

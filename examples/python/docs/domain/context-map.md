@@ -7,5 +7,5 @@
 
 | Upstream / External Context | Repository | Relationship / Pattern | Domain Port / ACL | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| `inventory` | Separate Repository | Anti-Corruption Layer (Customer-Supplier) | `InventoryPort` / `InventoryGateway` | `T.B.D.` |
-| `payment` | Separate Repository | Anti-Corruption Layer (Customer-Supplier) | `PaymentPort` / `PaymentGateway` | `T.B.D.` |
+| `inventory` | Separate Repository | Anti-Corruption Layer (Customer-Supplier) | `InventoryPort` (`application/ports/inventory/`) / `InventoryGateway` (`infrastructure/gateways/inventory/`) | `T.B.D.` |
+| `payment` | Separate Repository | Anti-Corruption Layer (Customer-Supplier) | `PaymentPort` (`application/ports/payment/`) / `PaymentGateway` (`infrastructure/gateways/payment/`) | `T.B.D.` |
