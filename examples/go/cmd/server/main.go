@@ -8,23 +8,25 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
-	"example.com/ordering-go/internal/application/order/commands"
-	"example.com/ordering-go/internal/infrastructure/acl/inventory"
-	"example.com/ordering-go/internal/infrastructure/acl/payment"
+
+	orderdto "example.com/ordering-go/internal/application/dtos/order"
+	ordersvc "example.com/ordering-go/internal/application/services/order"
 	httpdrv "example.com/ordering-go/internal/infrastructure/drivers/http"
 	"example.com/ordering-go/internal/infrastructure/drivers/kv"
-	persistence "example.com/ordering-go/internal/infrastructure/persistence/order"
-	"example.com/ordering-go/internal/presentation/web/i18n"
-	weborder "example.com/ordering-go/internal/presentation/web/order"
+	inventorygw "example.com/ordering-go/internal/infrastructure/gateways/inventory"
+	paymentgw "example.com/ordering-go/internal/infrastructure/gateways/payment"
+	orderrepo "example.com/ordering-go/internal/infrastructure/repositories/order"
+	ordercontroller "example.com/ordering-go/internal/presentation/controllers/order"
+	"example.com/ordering-go/internal/presentation/i18n"
 )
 
-func CreateOrderingApp(dataDir, inventoryUrl, paymentUrl string, timeout time.Duration) commands.OrderUseCases {
+func CreateOrderingApp(dataDir, inventoryUrl, paymentUrl string, timeout time.Duration) orderdto.OrderUseCases {
 	kvDrv := kv.FileKvDriver{DirPath: dataDir}
 	httpDrv := httpdrv.NewNetHttpJsonDriver(timeout)
-	repo := persistence.NewDriverOrderRepository(kvDrv)
-	inv := inventory.NewInventoryGateway(httpDrv, inventoryUrl)
-	pay := payment.NewPaymentGateway(httpDrv, paymentUrl)
-	return commands.NewOrderApplicationService(repo, inv, pay)
+	repo := orderrepo.NewDriverOrderRepository(kvDrv)
+	inv := inventorygw.NewInventoryGateway(httpDrv, inventoryUrl)
+	pay := paymentgw.NewPaymentGateway(httpDrv, paymentUrl)
+	return ordersvc.NewOrderApplicationService(repo, inv, pay)
 }
 
 func envOr(key, fallback string) string {
@@ -54,5 +56,5 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("LISTENING http://%s\n", ln.Addr().String())
-	_ = http.Serve(ln, weborder.NewOrderWebHandler(CreateOrderingApp(dataDir, invUrl, payUrl, time.Duration(timeoutMs)*time.Millisecond), msg))
+	_ = http.Serve(ln, ordercontroller.NewOrderWebHandler(CreateOrderingApp(dataDir, invUrl, payUrl, time.Duration(timeoutMs)*time.Millisecond), msg))
 }

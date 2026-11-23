@@ -5,7 +5,9 @@ DATA_DIR=$(mktemp -d)
 INV_PID=""
 PAY_PID=""
 cleanup() {
-  kill ${SRV_PID:-0} ${INV_PID:-0} ${PAY_PID:-0} 2>/dev/null || true
+  if [ -n "${SRV_PID:-}" ]; then kill "$SRV_PID" 2>/dev/null || true; fi
+  if [ -n "${INV_PID:-}" ]; then kill "$INV_PID" 2>/dev/null || true; fi
+  if [ -n "${PAY_PID:-}" ]; then kill "$PAY_PID" 2>/dev/null || true; fi
   rm -rf "$DATA_DIR" /tmp/ordering-go-server /tmp/ordering-go.log
 }
 trap cleanup EXIT

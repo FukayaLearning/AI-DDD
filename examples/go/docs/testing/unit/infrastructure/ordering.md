@@ -1,4 +1,4 @@
-# Unit Test Specification — infrastructure
+# Unit Test Specification — infrastructure/mappers/order, infrastructure/repositories/order, infrastructure/gateways/{inventory,payment}
 
 | ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
