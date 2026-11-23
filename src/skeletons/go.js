@@ -25,7 +25,7 @@ func Failure[T any, E any](err E) Result[T, E] {
 }
 `;
 
-  files["internal/domain/health/health.go"] = `package health
+  files["internal/domain/entities/health/health.go"] = `package health
 
 import (
 	"strings"
@@ -40,10 +40,6 @@ type DomainError struct {
 type HealthStatus struct {
 	Context      string
 	CheckedAtIso string
-}
-
-type ClockPort interface {
-	CurrentIso() shared.Result[string, DomainError]
 }
 
 func CreateHealthStatus(context string, checkedAtIso string) shared.Result[HealthStatus, DomainError] {
@@ -61,10 +57,23 @@ func CreateHealthStatus(context string, checkedAtIso string) shared.Result[Healt
 }
 `;
 
-  files["internal/application/health/queries/get_health.go"] = `package queries
+  files["internal/domain/services/health/clock_port.go"] = `package healthport
 
 import (
-	"${moduleName}/internal/domain/health"
+	"${moduleName}/internal/domain/entities/health"
+	"${moduleName}/internal/domain/shared"
+)
+
+type ClockPort interface {
+	CurrentIso() shared.Result[string, health.DomainError]
+}
+`;
+
+  files["internal/application/services/health/get_health.go"] = `package healthapp
+
+import (
+	"${moduleName}/internal/domain/entities/health"
+	healthport "${moduleName}/internal/domain/services/health"
 	"${moduleName}/internal/domain/shared"
 )
 
@@ -75,10 +84,10 @@ type GetHealthUseCase interface {
 // @implements REQ-${C}-001
 type CheckHealthService struct {
 	contextName string
-	clock       health.ClockPort
+	clock       healthport.ClockPort
 }
 
-func NewCheckHealthService(contextName string, clock health.ClockPort) *CheckHealthService {
+func NewCheckHealthService(contextName string, clock healthport.ClockPort) *CheckHealthService {
 	return &CheckHealthService{contextName: contextName, clock: clock}
 }
 
@@ -106,11 +115,11 @@ func (SystemClockDriver) ReadSystemIso() (string, error) {
 }
 `;
 
-  files["internal/infrastructure/persistence/health/clock_mapper.go"] = `package health
+  files["internal/infrastructure/mappers/health/clock_mapper.go"] = `package healthmapper
 
 import (
 	"strings"
-	domain "${moduleName}/internal/domain/health"
+	domain "${moduleName}/internal/domain/entities/health"
 	"${moduleName}/internal/domain/shared"
 )
 
@@ -126,12 +135,13 @@ func MapRawTimestamp(raw string) shared.Result[string, domain.DomainError] {
 }
 `;
 
-  files["internal/infrastructure/persistence/health/system_clock_adapter.go"] = `package health
+  files["internal/infrastructure/repositories/health/system_clock_adapter.go"] = `package healthrepo
 
 import (
-	domain "${moduleName}/internal/domain/health"
+	domain "${moduleName}/internal/domain/entities/health"
 	"${moduleName}/internal/domain/shared"
 	"${moduleName}/internal/infrastructure/drivers/clock"
+	healthmapper "${moduleName}/internal/infrastructure/mappers/health"
 )
 
 type SystemClockAdapter struct {
@@ -150,11 +160,11 @@ func (a *SystemClockAdapter) CurrentIso() shared.Result[string, domain.DomainErr
 			Message: "Failed to read system clock",
 		})
 	}
-	return MapRawTimestamp(raw)
+	return healthmapper.MapRawTimestamp(raw)
 }
 `;
 
-  files["internal/presentation/web/i18n/en.go"] = `package i18n
+  files["internal/presentation/i18n/en.go"] = `package i18n
 
 type HealthMessages struct {
 	Locale           string
@@ -179,7 +189,7 @@ var EnMessages = HealthMessages{
 
   if (locale !== "en") {
     const isJa = locale === "ja";
-    files[`internal/presentation/web/i18n/${locale}.go`] = `package i18n
+    files[`internal/presentation/i18n/${locale}.go`] = `package i18n
 
 var UserMessages = HealthMessages{
 	Locale:           ${JSON.stringify(locale)},
@@ -194,44 +204,54 @@ var UserMessages = HealthMessages{
 `;
   }
 
-  files["internal/presentation/web/health/web_server.go"] = `package health
+  files["internal/presentation/views/health/health_view.go"] = `package healthview
 
 import (
 	"fmt"
 	"html"
-	"net/http"
-	"${moduleName}/internal/application/health/queries"
-	"${moduleName}/internal/presentation/web/i18n"
+	"${moduleName}/internal/presentation/i18n"
 )
 
 func RenderHealthHTML(locale string, title string, body string) string {
 	return fmt.Sprintf("<!doctype html><html lang='%s'><head><meta charset='utf-8'><title>%s</title></head><body>%s</body></html>", html.EscapeString(locale), html.EscapeString(title), body)
 }
 
-func localizeError(msg i18n.HealthMessages, code, fallback string) string {
+func LocalizeError(msg i18n.HealthMessages, code, fallback string) string {
 	if localized, ok := msg.ErrorMessages[code]; ok {
 		return localized
 	}
 	return fallback
 }
+`;
 
-func NewWebHandler(useCase queries.GetHealthUseCase, msg i18n.HealthMessages) http.Handler {
+  files["internal/presentation/controllers/health/health_controller.go"] = `package healthcontroller
+
+import (
+	"fmt"
+	"html"
+	"net/http"
+	healthapp "${moduleName}/internal/application/services/health"
+	"${moduleName}/internal/presentation/i18n"
+	healthview "${moduleName}/internal/presentation/views/health"
+)
+
+func NewWebHandler(useCase healthapp.GetHealthUseCase, msg i18n.HealthMessages) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/" {
 			res := useCase.Execute()
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			if !res.Ok {
 				w.WriteHeader(http.StatusServiceUnavailable)
-				_, _ = w.Write([]byte(RenderHealthHTML(msg.Locale, msg.UnavailableTitle, fmt.Sprintf("<main><div data-testid='error-banner'>%s: %s</div></main>", html.EscapeString(res.Error.Code), html.EscapeString(localizeError(msg, res.Error.Code, res.Error.Message))))))
+				_, _ = w.Write([]byte(healthview.RenderHealthHTML(msg.Locale, msg.UnavailableTitle, fmt.Sprintf("<main><div data-testid='error-banner'>%s: %s</div></main>", html.EscapeString(res.Error.Code), html.EscapeString(healthview.LocalizeError(msg, res.Error.Code, res.Error.Message))))))
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(RenderHealthHTML(msg.Locale, msg.HealthyTitle, fmt.Sprintf("<main><h1 data-testid='health-status'>OK: %s</h1><p data-testid='checked-at'>%s</p></main>", html.EscapeString(res.Value.Context), html.EscapeString(res.Value.CheckedAtIso)))))
+			_, _ = w.Write([]byte(healthview.RenderHealthHTML(msg.Locale, msg.HealthyTitle, fmt.Sprintf("<main><h1 data-testid='health-status'>OK: %s</h1><p data-testid='checked-at'>%s</p></main>", html.EscapeString(res.Value.Context), html.EscapeString(res.Value.CheckedAtIso)))))
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(RenderHealthHTML(msg.Locale, msg.NotFoundTitle, fmt.Sprintf("<main><p data-testid='not-found'>%s</p></main>", html.EscapeString(msg.NotFoundBody)))))
+		_, _ = w.Write([]byte(healthview.RenderHealthHTML(msg.Locale, msg.NotFoundTitle, fmt.Sprintf("<main><p data-testid='not-found'>%s</p></main>", html.EscapeString(msg.NotFoundBody)))))
 	})
 }
 `;
@@ -251,17 +271,17 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"${moduleName}/internal/application/health/queries"
+	healthapp "${moduleName}/internal/application/services/health"
 	"${moduleName}/internal/infrastructure/drivers/clock"
-	persistence "${moduleName}/internal/infrastructure/persistence/health"
-	"${moduleName}/internal/presentation/web/health"
-	"${moduleName}/internal/presentation/web/i18n"
+	healthrepo "${moduleName}/internal/infrastructure/repositories/health"
+	healthcontroller "${moduleName}/internal/presentation/controllers/health"
+	"${moduleName}/internal/presentation/i18n"
 )
 
-func CreateApp(contextName string) queries.GetHealthUseCase {
+func CreateApp(contextName string) healthapp.GetHealthUseCase {
 	drv := clock.SystemClockDriver{}
-	adapter := persistence.NewSystemClockAdapter(drv)
-	return queries.NewCheckHealthService(contextName, adapter)
+	adapter := healthrepo.NewSystemClockAdapter(drv)
+	return healthapp.NewCheckHealthService(contextName, adapter)
 }
 
 func main() {
@@ -275,15 +295,15 @@ func main() {
 	}
 	fmt.Printf("LISTENING http://%s\\n", ln.Addr().String())
 ${goMainMsg}
-	_ = http.Serve(ln, health.NewWebHandler(CreateApp("${contextName}"), msg))
+	_ = http.Serve(ln, healthcontroller.NewWebHandler(CreateApp("${contextName}"), msg))
 }
 `;
 
-  files["internal/domain/health/health_test.go"] = `package health_test
+  files["internal/domain/entities/health/health_test.go"] = `package health_test
 
 import (
 	"testing"
-	"${moduleName}/internal/domain/health"
+	"${moduleName}/internal/domain/entities/health"
 )
 
 // UT-${C}-001, UT-${C}-002
@@ -299,12 +319,12 @@ func TestUT_${C}_001_CreateHealthStatus(t *testing.T) {
 }
 `;
 
-  files["internal/application/health/queries/get_health_test.go"] = `package queries_test
+  files["internal/application/services/health/get_health_test.go"] = `package healthapp_test
 
 import (
 	"testing"
-	"${moduleName}/internal/application/health/queries"
-	"${moduleName}/internal/domain/health"
+	healthapp "${moduleName}/internal/application/services/health"
+	"${moduleName}/internal/domain/entities/health"
 	"${moduleName}/internal/domain/shared"
 )
 
@@ -314,23 +334,24 @@ func (s stubClockPort) CurrentIso() shared.Result[string, health.DomainError] { 
 
 // UT-${C}-005, UT-${C}-006
 func TestUT_${C}_005_CheckHealthService(t *testing.T) {
-	svcOk := queries.NewCheckHealthService("${contextName}", stubClockPort{res: shared.Success[string, health.DomainError]("2026-11-22T00:00:00Z")})
+	svcOk := healthapp.NewCheckHealthService("${contextName}", stubClockPort{res: shared.Success[string, health.DomainError]("2026-11-22T00:00:00Z")})
 	if res := svcOk.Execute(); !res.Ok {
 		t.Fatalf("expected Ok")
 	}
-	svcErr := queries.NewCheckHealthService("${contextName}", stubClockPort{res: shared.Failure[string, health.DomainError](health.DomainError{Code: "CLOCK_UNAVAILABLE", Message: "down"})})
+	svcErr := healthapp.NewCheckHealthService("${contextName}", stubClockPort{res: shared.Failure[string, health.DomainError](health.DomainError{Code: "CLOCK_UNAVAILABLE", Message: "down"})})
 	if res := svcErr.Execute(); res.Ok || res.Error.Code != "CLOCK_UNAVAILABLE" {
 		t.Fatalf("expected Err")
 	}
 }
 `;
 
-  files["internal/infrastructure/persistence/health/system_clock_adapter_test.go"] = `package health_test
+  files["internal/infrastructure/repositories/health/system_clock_adapter_test.go"] = `package healthrepo_test
 
 import (
 	"errors"
 	"testing"
-	persistence "${moduleName}/internal/infrastructure/persistence/health"
+	healthmapper "${moduleName}/internal/infrastructure/mappers/health"
+	healthrepo "${moduleName}/internal/infrastructure/repositories/health"
 )
 
 type mockDriver struct {
@@ -342,32 +363,32 @@ func (m mockDriver) ReadSystemIso() (string, error) { return m.iso, m.err }
 
 // UT-${C}-003, UT-${C}-004
 func TestUT_${C}_003_SystemClockAdapter(t *testing.T) {
-	if res := persistence.MapRawTimestamp("2026-11-22T00:00:00Z"); !res.Ok {
+	if res := healthmapper.MapRawTimestamp("2026-11-22T00:00:00Z"); !res.Ok {
 		t.Fatalf("expected Ok")
 	}
-	if res := persistence.MapRawTimestamp(" "); res.Ok {
+	if res := healthmapper.MapRawTimestamp(" "); res.Ok {
 		t.Fatalf("expected Err")
 	}
-	if res := persistence.NewSystemClockAdapter(mockDriver{iso: "2026-11-22T00:00:00Z"}).CurrentIso(); !res.Ok {
+	if res := healthrepo.NewSystemClockAdapter(mockDriver{iso: "2026-11-22T00:00:00Z"}).CurrentIso(); !res.Ok {
 		t.Fatalf("expected Ok")
 	}
-	if res := persistence.NewSystemClockAdapter(mockDriver{err: errors.New("io")}).CurrentIso(); res.Ok {
+	if res := healthrepo.NewSystemClockAdapter(mockDriver{err: errors.New("io")}).CurrentIso(); res.Ok {
 		t.Fatalf("expected Err")
 	}
 }
 `;
 
-  files["internal/presentation/web/health/web_server_test.go"] = `package health_test
+  files["internal/presentation/controllers/health/health_controller_test.go"] = `package healthcontroller_test
 
 import (
 	"encoding/json"
 	"net/http/httptest"
 	"os/exec"
 	"testing"
-	domain "${moduleName}/internal/domain/health"
+	domain "${moduleName}/internal/domain/entities/health"
 	"${moduleName}/internal/domain/shared"
-	"${moduleName}/internal/presentation/web/health"
-	"${moduleName}/internal/presentation/web/i18n"
+	healthcontroller "${moduleName}/internal/presentation/controllers/health"
+	"${moduleName}/internal/presentation/i18n"
 )
 
 type mockUseCase struct {
@@ -379,7 +400,7 @@ func (m *mockUseCase) Execute() shared.Result[domain.HealthStatus, domain.Domain
 // UT-${C}-007
 func TestUT_${C}_007_PresentationWebUIWithBrowser(t *testing.T) {
 	uc := &mockUseCase{res: shared.Success[domain.HealthStatus, domain.DomainError](domain.HealthStatus{Context: "${contextName}", CheckedAtIso: "2026-11-22T00:00:00Z"})}
-	srv := httptest.NewServer(health.NewWebHandler(uc, i18n.EnMessages))
+	srv := httptest.NewServer(healthcontroller.NewWebHandler(uc, i18n.EnMessages))
 	defer srv.Close()
 
 	scenarios, _ := json.Marshal([]map[string]string{
@@ -530,7 +551,7 @@ if ! command -v go >/dev/null 2>&1; then
   echo "ERROR: 'go' toolchain not found in PATH." >&2
   exit 1
 fi
-go test -v -covermode=atomic -coverprofile=coverage.out ./internal/domain/... ./internal/application/... ./internal/infrastructure/persistence/... ./internal/presentation/...
+go test -v -covermode=atomic -coverprofile=coverage.out ./internal/domain/... ./internal/application/... ./internal/infrastructure/mappers/... ./internal/infrastructure/repositories/... ./internal/presentation/...
 go tool cover -func=coverage.out
 total=$(go tool cover -func=coverage.out | awk '/^total:/ {print $3}')
 if [ "$total" != "100.0%" ]; then

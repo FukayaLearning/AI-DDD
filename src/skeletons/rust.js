@@ -9,7 +9,8 @@ version = "0.1.0"
 edition = "2021"
 `;
 
-  files["src/domain/mod.rs"] = `pub mod health;
+  files["src/domain/mod.rs"] = `pub mod entities;
+pub mod services;
 pub mod shared;
 `;
   files["src/domain/shared/mod.rs"] = `pub mod result;
@@ -21,9 +22,11 @@ pub enum DomainResult<T, E> {
 }
 `;
 
-  files["src/domain/health/mod.rs"] = `pub mod health;
+  files["src/domain/entities/mod.rs"] = `pub mod health;
 `;
-  files["src/domain/health/health.rs"] = `use crate::domain::shared::result::DomainResult;
+  files["src/domain/entities/health/mod.rs"] = `pub mod health;
+`;
+  files["src/domain/entities/health/health.rs"] = `use crate::domain::shared::result::DomainResult;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DomainError {
@@ -35,10 +38,6 @@ pub struct DomainError {
 pub struct HealthStatus {
     pub context: String,
     pub checked_at_iso: String,
-}
-
-pub trait ClockPort {
-    fn current_iso(&self) -> DomainResult<String, DomainError>;
 }
 
 pub fn create_health_status(context: &str, checked_at_iso: &str) -> DomainResult<HealthStatus, DomainError> {
@@ -56,13 +55,26 @@ pub fn create_health_status(context: &str, checked_at_iso: &str) -> DomainResult
 }
 `;
 
-  files["src/application/mod.rs"] = `pub mod health;
+  files["src/domain/services/mod.rs"] = `pub mod health;
 `;
-  files["src/application/health/mod.rs"] = `pub mod queries;
+  files["src/domain/services/health/mod.rs"] = `pub mod clock_port;
 `;
-  files["src/application/health/queries/mod.rs"] = `pub mod get_health;
+  files["src/domain/services/health/clock_port.rs"] = `use crate::domain::entities::health::health::DomainError;
+use crate::domain::shared::result::DomainResult;
+
+pub trait ClockPort {
+    fn current_iso(&self) -> DomainResult<String, DomainError>;
+}
 `;
-  files["src/application/health/queries/get_health.rs"] = `use crate::domain::health::health::{create_health_status, ClockPort, DomainError, HealthStatus};
+
+  files["src/application/mod.rs"] = `pub mod services;
+`;
+  files["src/application/services/mod.rs"] = `pub mod health;
+`;
+  files["src/application/services/health/mod.rs"] = `pub mod get_health;
+`;
+  files["src/application/services/health/get_health.rs"] = `use crate::domain::entities::health::health::{create_health_status, DomainError, HealthStatus};
+use crate::domain::services::health::clock_port::ClockPort;
 use crate::domain::shared::result::DomainResult;
 
 pub trait GetHealthUseCase {
@@ -95,7 +107,8 @@ impl<C: ClockPort> GetHealthUseCase for CheckHealthService<C> {
 `;
 
   files["src/infrastructure/mod.rs"] = `pub mod drivers;
-pub mod persistence;
+pub mod mappers;
+pub mod repositories;
 `;
 
   files["src/infrastructure/drivers/mod.rs"] = `pub mod clock;
@@ -120,12 +133,11 @@ impl RawClockDriver for SystemClockDriver {
 }
 `;
 
-  files["src/infrastructure/persistence/mod.rs"] = `pub mod health;
+  files["src/infrastructure/mappers/mod.rs"] = `pub mod health;
 `;
-  files["src/infrastructure/persistence/health/mod.rs"] = `pub mod clock_mapper;
-pub mod system_clock_adapter;
+  files["src/infrastructure/mappers/health/mod.rs"] = `pub mod clock_mapper;
 `;
-  files["src/infrastructure/persistence/health/clock_mapper.rs"] = `use crate::domain::health::health::DomainError;
+  files["src/infrastructure/mappers/health/clock_mapper.rs"] = `use crate::domain::entities::health::health::DomainError;
 use crate::domain::shared::result::DomainResult;
 
 pub fn map_epoch_seconds(epoch_secs: u64) -> DomainResult<String, DomainError> {
@@ -139,10 +151,15 @@ pub fn map_epoch_seconds(epoch_secs: u64) -> DomainResult<String, DomainError> {
 }
 `;
 
-  files["src/infrastructure/persistence/health/system_clock_adapter.rs"] = `use crate::domain::health::health::{ClockPort, DomainError};
+  files["src/infrastructure/repositories/mod.rs"] = `pub mod health;
+`;
+  files["src/infrastructure/repositories/health/mod.rs"] = `pub mod system_clock_adapter;
+`;
+  files["src/infrastructure/repositories/health/system_clock_adapter.rs"] = `use crate::domain::entities::health::health::DomainError;
+use crate::domain::services::health::clock_port::ClockPort;
 use crate::domain::shared::result::DomainResult;
 use crate::infrastructure::drivers::clock::clock_driver::RawClockDriver;
-use crate::infrastructure::persistence::health::clock_mapper::map_epoch_seconds;
+use crate::infrastructure::mappers::health::clock_mapper::map_epoch_seconds;
 
 pub struct SystemClockAdapter<D: RawClockDriver> {
     driver: D,
@@ -167,13 +184,12 @@ impl<D: RawClockDriver> ClockPort for SystemClockAdapter<D> {
 }
 `;
 
-  files["src/presentation/mod.rs"] = `pub mod web;
-`;
-  files["src/presentation/web/mod.rs"] = `pub mod health;
+  files["src/presentation/mod.rs"] = `pub mod controllers;
+pub mod views;
 pub mod i18n;
 `;
-  files["src/presentation/web/i18n/mod.rs"] = locale !== "en" ? `pub mod en;\npub mod user;\n` : `pub mod en;\n`;
-  files["src/presentation/web/i18n/en.rs"] = `pub struct HealthMessages {
+  files["src/presentation/i18n/mod.rs"] = locale !== "en" ? `pub mod en;\npub mod user;\n` : `pub mod en;\n`;
+  files["src/presentation/i18n/en.rs"] = `pub struct HealthMessages {
     pub locale: &'static str,
     pub healthy_title: &'static str,
     pub unavailable_title: &'static str,
@@ -205,7 +221,7 @@ pub const EN_MESSAGES: HealthMessages = HealthMessages {
 
   if (locale !== "en") {
     const isJa = locale === "ja";
-    files[`src/presentation/web/i18n/${locale}.rs`] = `use super::en::HealthMessages;
+    files[`src/presentation/i18n/${locale}.rs`] = `use super::en::HealthMessages;
 
 pub const USER_MESSAGES: HealthMessages = HealthMessages {
     locale: ${JSON.stringify(locale)},
@@ -218,16 +234,14 @@ pub const USER_MESSAGES: HealthMessages = HealthMessages {
     ],
 };
 `;
-    files["src/presentation/web/i18n/mod.rs"] = `pub mod en;\n#[path = "${locale}.rs"]\npub mod user;\n`;
+    files["src/presentation/i18n/mod.rs"] = `pub mod en;\n#[path = "${locale}.rs"]\npub mod user;\n`;
   }
 
-  files["src/presentation/web/health/mod.rs"] = `pub mod web_server;
+  files["src/presentation/views/mod.rs"] = `pub mod health;
 `;
-  files["src/presentation/web/health/web_server.rs"] = `use crate::application::health::queries::get_health::GetHealthUseCase;
-use crate::domain::shared::result::DomainResult;
-use crate::presentation::web::i18n::en::{HealthMessages, EN_MESSAGES};
-use std::io::{Read, Write};
-use std::net::TcpStream;
+  files["src/presentation/views/health/mod.rs"] = `pub mod health_view;
+`;
+  files["src/presentation/views/health/health_view.rs"] = `use crate::presentation::i18n::en::HealthMessages;
 
 pub fn render_html(locale: &str, title: &str, body: &str) -> String {
     format!(
@@ -236,9 +250,21 @@ pub fn render_html(locale: &str, title: &str, body: &str) -> String {
     )
 }
 
-fn localized_error<'a>(messages: &'a HealthMessages, code: &str, message: &'a str) -> &'a str {
+pub fn localized_error<'a>(messages: &'a HealthMessages, code: &str, message: &'a str) -> &'a str {
     messages.error_message(code).unwrap_or(message)
 }
+`;
+
+  files["src/presentation/controllers/mod.rs"] = `pub mod health;
+`;
+  files["src/presentation/controllers/health/mod.rs"] = `pub mod health_controller;
+`;
+  files["src/presentation/controllers/health/health_controller.rs"] = `use crate::application::services::health::get_health::GetHealthUseCase;
+use crate::domain::shared::result::DomainResult;
+use crate::presentation::i18n::en::{HealthMessages, EN_MESSAGES};
+use crate::presentation::views::health::health_view::{localized_error, render_html};
+use std::io::{Read, Write};
+use std::net::TcpStream;
 
 pub fn handle_http_request<U: GetHealthUseCase>(use_case: &U, request_line: &str, messages: &HealthMessages) -> (u16, String) {
     let mut parts = request_line.split_whitespace();
@@ -307,17 +333,17 @@ pub mod presentation;
 
   const rsMainImport =
     locale !== "en"
-      ? `use ${crateName}::presentation::web::i18n::en::EN_MESSAGES;\nuse ${crateName}::presentation::web::i18n::user::USER_MESSAGES;`
-      : `use ${crateName}::presentation::web::i18n::en::EN_MESSAGES;`;
+      ? `use ${crateName}::presentation::i18n::en::EN_MESSAGES;\nuse ${crateName}::presentation::i18n::user::USER_MESSAGES;`
+      : `use ${crateName}::presentation::i18n::en::EN_MESSAGES;`;
   const rsMainMsg =
     locale !== "en"
       ? `    let app_locale = std::env::var("APP_LOCALE").unwrap_or_else(|_| ${JSON.stringify(locale)}.to_string());\n    let messages = if app_locale == "en" { &EN_MESSAGES } else { &USER_MESSAGES };`
       : `    let messages = &EN_MESSAGES;`;
 
-  files["src/main.rs"] = `use ${crateName}::application::health::queries::get_health::CheckHealthService;
+  files["src/main.rs"] = `use ${crateName}::application::services::health::get_health::CheckHealthService;
 use ${crateName}::infrastructure::drivers::clock::clock_driver::SystemClockDriver;
-use ${crateName}::infrastructure::persistence::health::system_clock_adapter::SystemClockAdapter;
-use ${crateName}::presentation::web::health::web_server::serve_single_connection;
+use ${crateName}::infrastructure::repositories::health::system_clock_adapter::SystemClockAdapter;
+use ${crateName}::presentation::controllers::health::health_controller::serve_single_connection;
 ${rsMainImport}
 use std::net::TcpListener;
 
@@ -455,14 +481,15 @@ try {
 }
 `;
 
-  files["tests/all_layers_test.rs"] = `use ${crateName}::application::health::queries::get_health::{CheckHealthService, GetHealthUseCase};
-use ${crateName}::domain::health::health::{create_health_status, ClockPort, DomainError, HealthStatus};
+  files["tests/all_layers_test.rs"] = `use ${crateName}::application::services::health::get_health::{CheckHealthService, GetHealthUseCase};
+use ${crateName}::domain::entities::health::health::{create_health_status, DomainError, HealthStatus};
+use ${crateName}::domain::services::health::clock_port::ClockPort;
 use ${crateName}::domain::shared::result::DomainResult;
 use ${crateName}::infrastructure::drivers::clock::clock_driver::RawClockDriver;
-use ${crateName}::infrastructure::persistence::health::clock_mapper::map_epoch_seconds;
-use ${crateName}::infrastructure::persistence::health::system_clock_adapter::SystemClockAdapter;
-use ${crateName}::presentation::web::health::web_server::serve_single_connection;
-use ${crateName}::presentation::web::i18n::en::EN_MESSAGES;${locale !== "en" ? `\nuse ${crateName}::presentation::web::i18n::user::USER_MESSAGES;` : ""}
+use ${crateName}::infrastructure::mappers::health::clock_mapper::map_epoch_seconds;
+use ${crateName}::infrastructure::repositories::health::system_clock_adapter::SystemClockAdapter;
+use ${crateName}::presentation::controllers::health::health_controller::serve_single_connection;
+use ${crateName}::presentation::i18n::en::EN_MESSAGES;${locale !== "en" ? `\nuse ${crateName}::presentation::i18n::user::USER_MESSAGES;` : ""}
 use std::net::TcpListener;
 use std::process::Command;
 use std::sync::{Arc, Mutex};

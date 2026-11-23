@@ -68,9 +68,23 @@ function runShell(cmd, args, cwd) {
     assert.match(agentsText, /Explicit Opt-Out Only/);
     assert.match(agentsText, /1-Task = 1-Commit Rule/);
 
-    // Static verify passes
+    // Tactical-pattern x aggregate layout
+    assert.ok(fs.existsSync(path.join(dir, "src", "domain", "entities", "health", "health_status.ts")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "domain", "services", "health", "clock_port.ts")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "application", "services", "health", "get_health.ts")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "infrastructure", "mappers", "health", "clock_mapper.ts")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "infrastructure", "repositories", "health", "system_clock_adapter.ts")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "presentation", "controllers", "health", "health_controller.ts")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "presentation", "views", "health", "health_view.ts")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "presentation", "i18n", "en.ts")));
+    assert.equal(fs.existsSync(path.join(dir, "src", "domain", "health")), false);
+    assert.equal(fs.existsSync(path.join(dir, "src", "infrastructure", "persistence")), false);
+    assert.equal(fs.existsSync(path.join(dir, "src", "presentation", "web")), false);
+
+    // Static verify and traceability check pass
     const vOut = runNodeCli(["verify", "--target", dir]);
     assert.match(vOut, /PASS:/);
+    assert.match(runNodeCli(["trace", "--target", dir, "--check"]), /Generated/);
 
     // Unit + Browser + 100% C1 passes immediately
     runShell("npm", ["run", "test:unit"], dir);
@@ -96,7 +110,18 @@ function runShell(cmd, args, cwd) {
       "--dist", "library",
       "--yes",
     ]);
+    assert.ok(fs.existsSync(path.join(dir, "src", "domain", "entities", "health", "health.py")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "domain", "services", "health", "clock_port.py")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "application", "services", "health", "get_health.py")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "infrastructure", "mappers", "health", "clock_mapper.py")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "infrastructure", "repositories", "health", "system_clock_adapter.py")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "presentation", "controllers", "health", "health_controller.py")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "presentation", "views", "health", "health_view.py")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "presentation", "i18n", "en.py")));
+    assert.equal(fs.existsSync(path.join(dir, "src", "infrastructure", "persistence")), false);
+    assert.equal(fs.existsSync(path.join(dir, "src", "presentation", "web")), false);
     runNodeCli(["verify", "--target", dir]);
+    assert.match(runNodeCli(["trace", "--target", dir, "--check"]), /Generated/);
     runShell("bash", ["scripts/run-unit-tests.sh"], dir);
     runShell("bash", ["scripts/test-integration.sh"], dir);
     console.log("PASS: Python skeleton init, verify, C1 100% browser unit test, and library integration test");
@@ -120,7 +145,18 @@ function runShell(cmd, args, cwd) {
     ]);
     assert.ok(fs.existsSync(path.join(dir, "Dockerfile")));
     assert.ok(fs.existsSync(path.join(dir, "docker-compose.integration.yml")));
+    assert.ok(fs.existsSync(path.join(dir, "internal", "domain", "entities", "health", "health.go")));
+    assert.ok(fs.existsSync(path.join(dir, "internal", "domain", "services", "health", "clock_port.go")));
+    assert.ok(fs.existsSync(path.join(dir, "internal", "application", "services", "health", "get_health.go")));
+    assert.ok(fs.existsSync(path.join(dir, "internal", "infrastructure", "mappers", "health", "clock_mapper.go")));
+    assert.ok(fs.existsSync(path.join(dir, "internal", "infrastructure", "repositories", "health", "system_clock_adapter.go")));
+    assert.ok(fs.existsSync(path.join(dir, "internal", "presentation", "controllers", "health", "health_controller.go")));
+    assert.ok(fs.existsSync(path.join(dir, "internal", "presentation", "views", "health", "health_view.go")));
+    assert.ok(fs.existsSync(path.join(dir, "internal", "presentation", "i18n", "en.go")));
+    assert.equal(fs.existsSync(path.join(dir, "internal", "infrastructure", "persistence")), false);
+    assert.equal(fs.existsSync(path.join(dir, "internal", "presentation", "web")), false);
     runNodeCli(["verify", "--target", dir]);
+    assert.match(runNodeCli(["trace", "--target", dir, "--check"]), /Generated/);
     console.log("PASS: Go skeleton init (docker mode) and governance verify");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -140,7 +176,18 @@ function runShell(cmd, args, cwd) {
       "--dist", "binary",
       "--yes",
     ]);
+    assert.ok(fs.existsSync(path.join(dir, "src", "domain", "entities", "health", "health.rs")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "domain", "services", "health", "clock_port.rs")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "application", "services", "health", "get_health.rs")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "infrastructure", "mappers", "health", "clock_mapper.rs")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "infrastructure", "repositories", "health", "system_clock_adapter.rs")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "presentation", "controllers", "health", "health_controller.rs")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "presentation", "views", "health", "health_view.rs")));
+    assert.ok(fs.existsSync(path.join(dir, "src", "presentation", "i18n", "en.rs")));
+    assert.equal(fs.existsSync(path.join(dir, "src", "infrastructure", "persistence")), false);
+    assert.equal(fs.existsSync(path.join(dir, "src", "presentation", "web")), false);
     runNodeCli(["verify", "--target", dir]);
+    assert.match(runNodeCli(["trace", "--target", dir, "--check"]), /Generated/);
     runShell("bash", ["scripts/test-unit-c1.sh"], dir);
     runShell("bash", ["scripts/test-integration.sh"], dir);
     console.log("PASS: Rust skeleton init, verify, cargo test --offline + browser test, and binary integration test");
@@ -165,7 +212,7 @@ function runShell(cmd, args, cwd) {
 
     // (a) presentation importing infrastructure
     fs.appendFileSync(
-      path.join(dir, "src", "presentation", "web", "health", "web_server.ts"),
+      path.join(dir, "src", "presentation", "controllers", "health", "health_controller.ts"),
       '\nimport { SystemClockDriver } from "../../../infrastructure/drivers/clock/clock_driver.ts";\n'
     );
     // (b) inline ignore comment

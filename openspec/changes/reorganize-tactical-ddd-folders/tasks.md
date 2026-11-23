@@ -10,7 +10,7 @@
 
 ## 3. 4 言語スケルトン生成器（`src/skeletons/*.js`）の更新
 
-- [ ] 3.1 `src/skeletons/{typescript,python,go,rust,common_docs}.js` を新 3 階層フォルダ構成（`Layer -> Tactical Pattern -> Aggregate/Module`）に更新し、`ai-ddd init` の生成物に対して `ai-ddd verify` および `ai-ddd trace --check` が通過することをテストで確認する
+- [x] 3.1 `src/skeletons/{typescript,python,go,rust,common_docs}.js` を新 3 階層フォルダ構成（`Layer -> Tactical Pattern -> Aggregate/Module`）に更新し、`ai-ddd init` の生成物に対して `ai-ddd verify` および `ai-ddd trace --check` が通過することをテストで確認する
 
 ## 4. 4 言語リファレンス実装（`examples/*`）の新フォルダ構成への移行と検証
 

@@ -26,10 +26,10 @@ export function generateSkeletonDocs({ projectName, contextName, contextCode, lo
 | Term (English Identifier) | Domain Meaning | Layer / Pattern | Notes |
 | :--- | :--- | :--- | :--- |
 | \`Result<T, E>\` | Explicit success (\`Ok\`) or typed failure (\`Err\`) | Domain Shared | All expected errors are values |
-| \`HealthStatus\` | Operational status of this Bounded Context service | Domain Value Object | Under \`domain/health/\` |
-| \`DomainError\` | Typed domain/infrastructure error union | Domain Error | Under \`domain/health/\` |
-| \`ClockPort\` | Port reading current ISO timestamp | Domain Port | Implemented in \`infrastructure/persistence/health/\` |
-| \`GetHealthUseCase\` | Query use case returning \`HealthStatus\` | Application Query | Under \`application/health/queries/\` |
+| \`HealthStatus\` | Operational status of this Bounded Context service | Domain Entity | Under \`domain/entities/health/\` |
+| \`DomainError\` | Typed domain/infrastructure error union | Domain Error | Under \`domain/entities/health/\` |
+| \`ClockPort\` | Port reading current ISO timestamp | Domain Service Port | Declared in \`domain/services/health/\`, implemented in \`infrastructure/repositories/health/\` |
+| \`GetHealthUseCase\` | Use case returning \`HealthStatus\` | Application Service | Under \`application/services/health/\` |
 `;
 
   const cmMaster = `# Context Map — ${contextName}
@@ -41,7 +41,7 @@ export function generateSkeletonDocs({ projectName, contextName, contextCode, lo
 
 | Upstream / External Context | Repository | Relationship / Pattern | Application / ACL Port | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| *(Add external Bounded Contexts here as ACL ports are introduced)* | Separate Repository | ACL / Customer-Supplier | \`application/shared/\` | \`T.B.D.\` |
+| *(Add external Bounded Contexts here as ACL ports are introduced)* | Separate Repository | ACL / Customer-Supplier | \`application/ports/<external-context>/\` | \`T.B.D.\` |
 `;
 
   const specMaster = `# ${contextName}/health Specification
@@ -66,7 +66,7 @@ The system SHALL evaluate the current timestamp via \`ClockPort\` and return \`H
 - **THEN** the system returns \`CLOCK_UNAVAILABLE\` and renders the service unavailable page
 `;
 
-  const unitDomainMaster = `# Unit Test Specification — domain/health
+  const unitDomainMaster = `# Unit Test Specification — domain/entities/health
 
 | ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -74,7 +74,7 @@ The system SHALL evaluate the current timestamp via \`ClockPort\` and return \`H
 | \`UT-${C}-002\` | \`createHealthStatus\` | Boundary value (empty) | Whitespace-only timestamp | \`Err(INVALID_TIMESTAMP)\` | \`REQ-${C}-001\` | \`tests/unit/domain_application\` |
 `;
 
-  const unitInfraMaster = `# Unit Test Specification — infrastructure/persistence/health
+  const unitInfraMaster = `# Unit Test Specification — infrastructure/mappers/health & infrastructure/repositories/health
 
 | ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -82,7 +82,7 @@ The system SHALL evaluate the current timestamp via \`ClockPort\` and return \`H
 | \`UT-${C}-004\` | \`SystemClockAdapter\` | Mock driver failure | Driver returns ISO / throws I/O error | \`Ok\` / \`Err(CLOCK_UNAVAILABLE)\` | \`SCN-${C}-001-02\` | \`tests/unit/infrastructure\` |
 `;
 
-  const unitAppMaster = `# Unit Test Specification — application/health
+  const unitAppMaster = `# Unit Test Specification — application/services/health
 
 | ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -90,7 +90,7 @@ The system SHALL evaluate the current timestamp via \`ClockPort\` and return \`H
 | \`UT-${C}-006\` | \`CheckHealthService\` | Scenario 1-to-1 | Mock \`ClockPort\` returns \`Err\` | \`Err(CLOCK_UNAVAILABLE)\` | \`SCN-${C}-001-02\` | \`tests/unit/domain_application\` |
 `;
 
-  const unitPresMaster = `# Unit Test Specification — presentation/web/health
+  const unitPresMaster = `# Unit Test Specification — presentation/controllers/health & presentation/views/health
 
 | ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |

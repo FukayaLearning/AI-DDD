@@ -77,8 +77,8 @@ export function err<T = never, E = unknown>(error: E): Result<T, E> {
 }
 `;
 
-  files["src/domain/health/health.ts"] = `import type { Result } from "../shared/result.ts";
-import { err, ok } from "../shared/result.ts";
+  files["src/domain/entities/health/health_status.ts"] = `import type { Result } from "../../shared/result.ts";
+import { err, ok } from "../../shared/result.ts";
 
 export type DomainError =
   | { readonly code: "INVALID_TIMESTAMP"; readonly message: string }
@@ -99,6 +99,10 @@ export function createHealthStatus(
   }
   return ok({ context, checkedAtIso: trimmed });
 }
+`;
+
+  files["src/domain/services/health/clock_port.ts"] = `import type { DomainError } from "../../entities/health/health_status.ts";
+import type { Result } from "../../shared/result.ts";
 
 export interface ClockPort {
   currentIso(): Promise<Result<string, DomainError>>;
@@ -106,8 +110,9 @@ export interface ClockPort {
 `;
 
   // Application layer (depends only on domain)
-  files["src/application/health/queries/get_health.ts"] = `import type { ClockPort, DomainError, HealthStatus } from "../../../domain/health/health.ts";
-import { createHealthStatus } from "../../../domain/health/health.ts";
+  files["src/application/services/health/get_health.ts"] = `import type { DomainError, HealthStatus } from "../../../domain/entities/health/health_status.ts";
+import { createHealthStatus } from "../../../domain/entities/health/health_status.ts";
+import type { ClockPort } from "../../../domain/services/health/clock_port.ts";
 import type { Result } from "../../../domain/shared/result.ts";
 import { err } from "../../../domain/shared/result.ts";
 
@@ -147,7 +152,7 @@ export class SystemClockDriver implements RawClockDriver {
 }
 `;
 
-  files["src/infrastructure/persistence/health/clock_mapper.ts"] = `import type { DomainError } from "../../../domain/health/health.ts";
+  files["src/infrastructure/mappers/health/clock_mapper.ts"] = `import type { DomainError } from "../../../domain/entities/health/health_status.ts";
 import type { Result } from "../../../domain/shared/result.ts";
 import { err, ok } from "../../../domain/shared/result.ts";
 
@@ -160,11 +165,12 @@ export function mapRawTimestamp(raw: string): Result<string, DomainError> {
 }
 `;
 
-  files["src/infrastructure/persistence/health/system_clock_adapter.ts"] = `import type { ClockPort, DomainError } from "../../../domain/health/health.ts";
+  files["src/infrastructure/repositories/health/system_clock_adapter.ts"] = `import type { DomainError } from "../../../domain/entities/health/health_status.ts";
+import type { ClockPort } from "../../../domain/services/health/clock_port.ts";
 import type { Result } from "../../../domain/shared/result.ts";
 import { err } from "../../../domain/shared/result.ts";
 import type { RawClockDriver } from "../../drivers/clock/clock_driver.ts";
-import { mapRawTimestamp } from "./clock_mapper.ts";
+import { mapRawTimestamp } from "../../mappers/health/clock_mapper.ts";
 
 export class SystemClockAdapter implements ClockPort {
   private readonly driver: RawClockDriver;
@@ -185,7 +191,7 @@ export class SystemClockAdapter implements ClockPort {
 `;
 
   // Presentation layer i18n catalogs & web handler
-  files["src/presentation/web/i18n/en.ts"] = `export interface HealthMessages {
+  files["src/presentation/i18n/en.ts"] = `export interface HealthMessages {
   readonly locale: string;
   readonly healthyTitle: string;
   readonly unavailableTitle: string;
@@ -208,7 +214,7 @@ export const enMessages: HealthMessages = {
 
   if (locale !== "en") {
     const isJa = locale === "ja";
-    files[`src/presentation/web/i18n/${locale}.ts`] = `import type { HealthMessages } from "./en.ts";
+    files[`src/presentation/i18n/${locale}.ts`] = `import type { HealthMessages } from "./en.ts";
 
 export const userMessages: HealthMessages = {
   locale: ${JSON.stringify(locale)},
@@ -223,10 +229,7 @@ export const userMessages: HealthMessages = {
 `;
   }
 
-  files["src/presentation/web/health/web_server.ts"] = `import http from "node:http";
-import type { GetHealthUseCase } from "../../../application/health/queries/get_health.ts";
-import type { HealthMessages } from "../i18n/en.ts";
-import { enMessages } from "../i18n/en.ts";
+  files["src/presentation/views/health/health_view.ts"] = `import type { HealthMessages } from "../../i18n/en.ts";
 
 export function renderHealthHtml(locale: string, title: string, bodyHtml: string): string {
   return \`<!doctype html>
@@ -236,9 +239,16 @@ export function renderHealthHtml(locale: string, title: string, bodyHtml: string
 </html>\`;
 }
 
-function localizeError(messages: HealthMessages, error: { code: string; message: string }): string {
+export function localizeError(messages: HealthMessages, error: { code: string; message: string }): string {
   return messages.errorMessages[error.code] ?? error.message;
 }
+`;
+
+  files["src/presentation/controllers/health/health_controller.ts"] = `import http from "node:http";
+import type { GetHealthUseCase } from "../../../application/services/health/get_health.ts";
+import type { HealthMessages } from "../../i18n/en.ts";
+import { enMessages } from "../../i18n/en.ts";
+import { localizeError, renderHealthHtml } from "../../views/health/health_view.ts";
 
 export function createWebHandler(useCase: GetHealthUseCase, messages: HealthMessages = enMessages) {
   return async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
@@ -296,17 +306,17 @@ export async function startPresentationServer(
   // Composition Root (main.ts)
   const mainCatalogImport =
     locale !== "en"
-      ? `import { enMessages } from "./presentation/web/i18n/en.ts";\nimport { userMessages } from "./presentation/web/i18n/${locale}.ts";`
-      : `import { enMessages } from "./presentation/web/i18n/en.ts";`;
+      ? `import { enMessages } from "./presentation/i18n/en.ts";\nimport { userMessages } from "./presentation/i18n/${locale}.ts";`
+      : `import { enMessages } from "./presentation/i18n/en.ts";`;
   const mainMessagesSelect =
     locale !== "en"
       ? `const activeMessages = (process.env.APP_LOCALE ?? ${JSON.stringify(locale)}) === "en" ? enMessages : userMessages;`
       : `const activeMessages = enMessages;`;
 
-  files["src/main.ts"] = `import { CheckHealthService } from "./application/health/queries/get_health.ts";
+  files["src/main.ts"] = `import { CheckHealthService } from "./application/services/health/get_health.ts";
 import { SystemClockDriver } from "./infrastructure/drivers/clock/clock_driver.ts";
-import { SystemClockAdapter } from "./infrastructure/persistence/health/system_clock_adapter.ts";
-import { startPresentationServer } from "./presentation/web/health/web_server.ts";
+import { SystemClockAdapter } from "./infrastructure/repositories/health/system_clock_adapter.ts";
+import { startPresentationServer } from "./presentation/controllers/health/health_controller.ts";
 ${mainCatalogImport}
 
 export function createApp(contextName = "${contextName}") {
@@ -573,8 +583,8 @@ console.log(\`PASS: 100% C1 branch coverage verified across \${srcFiles.length} 
 
   // Tests
   files["tests/unit/domain_application.test.mjs"] = `import assert from "node:assert/strict";
-import { createHealthStatus } from "../../src/domain/health/health.ts";
-import { CheckHealthService } from "../../src/application/health/queries/get_health.ts";
+import { createHealthStatus } from "../../src/domain/entities/health/health_status.ts";
+import { CheckHealthService } from "../../src/application/services/health/get_health.ts";
 import { err, ok } from "../../src/domain/shared/result.ts";
 
 const cases = [];
@@ -615,8 +625,8 @@ export async function run() {
 `;
 
   files["tests/unit/infrastructure.test.mjs"] = `import assert from "node:assert/strict";
-import { mapRawTimestamp } from "../../src/infrastructure/persistence/health/clock_mapper.ts";
-import { SystemClockAdapter } from "../../src/infrastructure/persistence/health/system_clock_adapter.ts";
+import { mapRawTimestamp } from "../../src/infrastructure/mappers/health/clock_mapper.ts";
+import { SystemClockAdapter } from "../../src/infrastructure/repositories/health/system_clock_adapter.ts";
 
 const cases = [];
 function test(name, fn) { cases.push({ name, fn }); }
@@ -644,7 +654,7 @@ export async function run() {
   const presLocaleCheck =
     locale !== "en"
       ? `  nextResult = ok({ context: "${contextName}", checkedAtIso: "2026-11-22T00:00:00Z" });
-  const { userMessages } = await import("../../src/presentation/web/i18n/${locale}.ts");
+  const { userMessages } = await import("../../src/presentation/i18n/${locale}.ts");
   const srvUser = await startPresentationServer(mockUseCase, 0, userMessages);
   const bUser = await launchHeadlessBrowser();
   try {
@@ -658,7 +668,7 @@ export async function run() {
 
   files["tests/unit/presentation.browser.test.mjs"] = `import assert from "node:assert/strict";
 import { err, ok } from "../../src/domain/shared/result.ts";
-import { startPresentationServer } from "../../src/presentation/web/health/web_server.ts";
+import { startPresentationServer } from "../../src/presentation/controllers/health/health_controller.ts";
 import { launchHeadlessBrowser } from "../../scripts/browser-helper.mjs";
 
 const cases = [];

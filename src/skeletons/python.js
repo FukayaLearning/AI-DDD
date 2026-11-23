@@ -22,19 +22,26 @@ fail_under = 100
   files["src/__init__.py"] = "";
   files["src/domain/__init__.py"] = "";
   files["src/domain/shared/__init__.py"] = "";
-  files["src/domain/health/__init__.py"] = "";
+  files["src/domain/entities/__init__.py"] = "";
+  files["src/domain/entities/health/__init__.py"] = "";
+  files["src/domain/services/__init__.py"] = "";
+  files["src/domain/services/health/__init__.py"] = "";
   files["src/application/__init__.py"] = "";
-  files["src/application/health/__init__.py"] = "";
-  files["src/application/health/queries/__init__.py"] = "";
+  files["src/application/services/__init__.py"] = "";
+  files["src/application/services/health/__init__.py"] = "";
   files["src/infrastructure/__init__.py"] = "";
   files["src/infrastructure/drivers/__init__.py"] = "";
   files["src/infrastructure/drivers/clock/__init__.py"] = "";
-  files["src/infrastructure/persistence/__init__.py"] = "";
-  files["src/infrastructure/persistence/health/__init__.py"] = "";
+  files["src/infrastructure/mappers/__init__.py"] = "";
+  files["src/infrastructure/mappers/health/__init__.py"] = "";
+  files["src/infrastructure/repositories/__init__.py"] = "";
+  files["src/infrastructure/repositories/health/__init__.py"] = "";
   files["src/presentation/__init__.py"] = "";
-  files["src/presentation/web/__init__.py"] = "";
-  files["src/presentation/web/i18n/__init__.py"] = "";
-  files["src/presentation/web/health/__init__.py"] = "";
+  files["src/presentation/controllers/__init__.py"] = "";
+  files["src/presentation/controllers/health/__init__.py"] = "";
+  files["src/presentation/views/__init__.py"] = "";
+  files["src/presentation/views/health/__init__.py"] = "";
+  files["src/presentation/i18n/__init__.py"] = "";
 
   files["src/domain/shared/result.py"] = `from dataclasses import dataclass
 from typing import Generic, TypeVar
@@ -58,8 +65,7 @@ class Err(Generic[E]):
 Result = Ok[T] | Err[E]
 `;
 
-  files["src/domain/health/health.py"] = `from dataclasses import dataclass
-from typing import Protocol
+  files["src/domain/entities/health/health.py"] = `from dataclasses import dataclass
 from src.domain.shared.result import Err, Ok, Result
 
 
@@ -80,14 +86,20 @@ def create_health_status(context: str, checked_at_iso: str) -> Result[HealthStat
     if not trimmed:
         return Err(DomainError(code="INVALID_TIMESTAMP", message="Timestamp must not be empty"))
     return Ok(HealthStatus(context=context, checked_at_iso=trimmed))
+`;
+
+  files["src/domain/services/health/clock_port.py"] = `from typing import Protocol
+from src.domain.entities.health.health import DomainError
+from src.domain.shared.result import Result
 
 
 class ClockPort(Protocol):
     def current_iso(self) -> Result[str, DomainError]: ...
 `;
 
-  files["src/application/health/queries/get_health.py"] = `from typing import Protocol
-from src.domain.health.health import ClockPort, DomainError, HealthStatus, create_health_status
+  files["src/application/services/health/get_health.py"] = `from typing import Protocol
+from src.domain.entities.health.health import DomainError, HealthStatus, create_health_status
+from src.domain.services.health.clock_port import ClockPort
 from src.domain.shared.result import Err, Result
 
 
@@ -121,7 +133,7 @@ class SystemClockDriver:
         return datetime.now(timezone.utc).isoformat()
 `;
 
-  files["src/infrastructure/persistence/health/clock_mapper.py"] = `from src.domain.health.health import DomainError
+  files["src/infrastructure/mappers/health/clock_mapper.py"] = `from src.domain.entities.health.health import DomainError
 from src.domain.shared.result import Err, Ok, Result
 
 
@@ -132,10 +144,10 @@ def map_raw_timestamp(raw: str) -> Result[str, DomainError]:
     return Ok(trimmed)
 `;
 
-  files["src/infrastructure/persistence/health/system_clock_adapter.py"] = `from src.domain.health.health import DomainError
+  files["src/infrastructure/repositories/health/system_clock_adapter.py"] = `from src.domain.entities.health.health import DomainError
 from src.domain.shared.result import Err, Result
 from src.infrastructure.drivers.clock.clock_driver import RawClockDriver
-from src.infrastructure.persistence.health.clock_mapper import map_raw_timestamp
+from src.infrastructure.mappers.health.clock_mapper import map_raw_timestamp
 
 
 class SystemClockAdapter:
@@ -150,7 +162,7 @@ class SystemClockAdapter:
         return map_raw_timestamp(raw)
 `;
 
-  files["src/presentation/web/i18n/en.py"] = `MESSAGES = {
+  files["src/presentation/i18n/en.py"] = `MESSAGES = {
     "locale": "en",
     "healthyTitle": "Service Healthy",
     "unavailableTitle": "Service Unavailable",
@@ -164,7 +176,7 @@ class SystemClockAdapter:
 
   if (locale !== "en") {
     const isJa = locale === "ja";
-    files[`src/presentation/web/i18n/${locale}.py`] = `MESSAGES = {
+    files[`src/presentation/i18n/${locale}.py`] = `MESSAGES = {
     "locale": ${JSON.stringify(locale)},
     "healthyTitle": ${JSON.stringify(isJa ? "サービス正常" : `[${locale}] Service Healthy`)},
     "unavailableTitle": ${JSON.stringify(isJa ? "サービス利用不可" : `[${locale}] Service Unavailable`)},
@@ -177,23 +189,28 @@ class SystemClockAdapter:
 `;
   }
 
-  files["src/presentation/web/health/web_server.py"] = `from contextlib import contextmanager
-from html import escape
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from threading import Thread
-from typing import Dict, Iterator, Optional
-from src.application.health.queries.get_health import GetHealthUseCase
-from src.domain.shared.result import Err
-from src.presentation.web.i18n.en import MESSAGES as EN_MESSAGES
+  files["src/presentation/views/health/health_view.py"] = `from html import escape
+from typing import Dict
 
 
 def render_html(locale: str, title: str, body: str) -> str:
     return f"<!doctype html><html lang='{escape(locale)}'><head><meta charset='utf-8'><title>{escape(title)}</title></head><body>{body}</body></html>"
 
 
-def _localize_error(msg: Dict[str, object], code: str, fallback: str) -> str:
+def localize_error(msg: Dict[str, object], code: str, fallback: str) -> str:
     localized = msg.get("errorMessages", {})
     return localized.get(code, fallback)
+`;
+
+  files["src/presentation/controllers/health/health_controller.py"] = `from contextlib import contextmanager
+from html import escape
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
+from typing import Dict, Iterator
+from src.application.services.health.get_health import GetHealthUseCase
+from src.domain.shared.result import Err
+from src.presentation.i18n.en import MESSAGES as EN_MESSAGES
+from src.presentation.views.health.health_view import localize_error, render_html
 
 
 def make_handler(use_case: GetHealthUseCase, messages: Dict[str, str] = EN_MESSAGES):
@@ -210,7 +227,7 @@ def make_handler(use_case: GetHealthUseCase, messages: Dict[str, str] = EN_MESSA
                     html = render_html(
                         msg["locale"],
                         msg["unavailableTitle"],
-                        f"<main><div data-testid='error-banner'>{escape(result.error.code)}: {escape(_localize_error(msg, result.error.code, result.error.message))}</div></main>",
+                        f"<main><div data-testid='error-banner'>{escape(result.error.code)}: {escape(localize_error(msg, result.error.code, result.error.message))}</div></main>",
                     )
                     self._send(503, html)
                     return
@@ -252,15 +269,15 @@ def run_presentation_server(use_case: GetHealthUseCase, port: int = 0, messages:
     locale !== "en"
       ? `    import importlib
     active_locale = os.environ.get("APP_LOCALE", ${JSON.stringify(locale)})
-    messages = importlib.import_module("src.presentation.web.i18n.en").MESSAGES if active_locale == "en" else importlib.import_module(f"src.presentation.web.i18n.{active_locale}").MESSAGES`
-      : `    from src.presentation.web.i18n.en import MESSAGES as messages`;
+    messages = importlib.import_module("src.presentation.i18n.en").MESSAGES if active_locale == "en" else importlib.import_module(f"src.presentation.i18n.{active_locale}").MESSAGES`
+      : `    from src.presentation.i18n.en import MESSAGES as messages`;
 
   files["src/main.py"] = `import os
 from http.server import ThreadingHTTPServer
-from src.application.health.queries.get_health import CheckHealthService
+from src.application.services.health.get_health import CheckHealthService
 from src.infrastructure.drivers.clock.clock_driver import SystemClockDriver
-from src.infrastructure.persistence.health.system_clock_adapter import SystemClockAdapter
-from src.presentation.web.health.web_server import make_handler
+from src.infrastructure.repositories.health.system_clock_adapter import SystemClockAdapter
+from src.presentation.controllers.health.health_controller import make_handler
 
 
 def create_app(context_name: str = "${contextName}") -> CheckHealthService:
@@ -502,12 +519,12 @@ try {
 import pathlib
 import subprocess
 import unittest
-from src.application.health.queries.get_health import CheckHealthService
-from src.domain.health.health import DomainError, create_health_status
+from src.application.services.health.get_health import CheckHealthService
+from src.domain.entities.health.health import DomainError, create_health_status
 from src.domain.shared.result import Err, Ok
-from src.infrastructure.persistence.health.clock_mapper import map_raw_timestamp
-from src.infrastructure.persistence.health.system_clock_adapter import SystemClockAdapter
-from src.presentation.web.health.web_server import run_presentation_server
+from src.infrastructure.mappers.health.clock_mapper import map_raw_timestamp
+from src.infrastructure.repositories.health.system_clock_adapter import SystemClockAdapter
+from src.presentation.controllers.health.health_controller import run_presentation_server
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 
@@ -557,7 +574,7 @@ class TestSkeletonLayers(unittest.TestCase):
 
     def test_presentation_browser_all_branches(self) -> None:
         """UT-${C}-007"""
-        from src.domain.health.health import HealthStatus
+        from src.domain.entities.health.health import HealthStatus
         mock_uc = _ConfigurableMockUseCase(Ok(HealthStatus(context="${contextName}", checked_at_iso="2026-11-22T00:00:00Z")))
         with run_presentation_server(mock_uc, 0) as base_url:
             scenarios = [
@@ -571,7 +588,7 @@ class TestSkeletonLayers(unittest.TestCase):
             ]
             subprocess.run(["node", str(ROOT / "scripts" / "browser_driver.mjs"), json.dumps(scenarios_err)], check=True)
 ${locale !== "en" ? `        import importlib
-        user_msg = importlib.import_module("src.presentation.web.i18n.${locale}").MESSAGES
+        user_msg = importlib.import_module("src.presentation.i18n.${locale}").MESSAGES
         with run_presentation_server(mock_uc, 0, user_msg) as base_url_loc:
             subprocess.run(["node", str(ROOT / "scripts" / "browser_driver.mjs"), json.dumps([{"url": f"{base_url_loc}/", "selector": "[data-testid='error-banner']", "expected": ${JSON.stringify(locale === "ja" ? "CLOCK_UNAVAILABLE: システム時刻を取得できません" : `CLOCK_UNAVAILABLE: [${locale}] System clock is unavailable`)} }])], check=True)` : ""}
 `;
