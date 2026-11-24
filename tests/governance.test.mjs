@@ -284,7 +284,7 @@ The system SHALL place.
     writeFile(
       dir,
       "docs/testing/unit/domain/order.md",
-      "| ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| `UT-ORD-001` | Order | BVA | valid | ok | `REQ-ORD-001` | `tests/unit/domain.test.mjs` |\n| `UT-ORD-002` | Order | BVA | bad | err | `REQ-ORD-001` | `tests/unit/domain.test.mjs` |\n"
+      "| ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| `UT-ORD-001` | Order | BVA | valid | ok | `REQ-ORD-001`, `SCN-ORD-001-01` | `tests/unit/domain.test.mjs` |\n| `UT-ORD-002` | Order | BVA | bad | err | `REQ-ORD-001` | `tests/unit/domain.test.mjs` |\n"
     );
     writeFile(
       dir,
@@ -578,3 +578,147 @@ console.log("PASS: governance integration checklist IT-only case ID checks");
 }
 
 console.log("PASS: governance multi-language aggregate isolation tests");
+
+// 12. DDD model integrity: aggregate/VO encapsulation, event lifecycle, and UL term mismatch
+{
+  const dir = makeFixture();
+  try {
+    writeFile(
+      dir,
+      "docs/domain/ubiquitous-language.md",
+      "# UL\n| Term | Meaning |\n| :--- | :--- |\n| `Order` | order |\n| `Ghost` | missing term |\n"
+    );
+    writeFile(
+      dir,
+      "internal/domain/entities/order/order.go",
+      "package order\ntype Order struct {\n    Status string\n}\n"
+    );
+    writeFile(
+      dir,
+      "internal/domain/entities/order/event.go",
+      "package order\ntype OrderConfirmedEvent struct{}\n"
+    );
+    const report = verifyProject(dir);
+    assert.equal(report.ok, false);
+    assert.ok(
+      report.errors.some((e) => e.includes("[Model Integrity]") && e.includes("exposes exported field 'Status'")),
+      JSON.stringify(report.errors)
+    );
+    assert.ok(
+      report.errors.some((e) => e.includes("[Model Integrity]") && e.includes("no pull/clear + dispatch")),
+      JSON.stringify(report.errors)
+    );
+    assert.ok(
+      report.errors.some((e) => e.includes("[Model Integrity]") && e.includes("'Ghost'")),
+      JSON.stringify(report.errors)
+    );
+
+    // Fix: unexported fields + accessor, pull/clear + publisher, and the missing UL term in code
+    writeFile(
+      dir,
+      "internal/domain/entities/order/order.go",
+      "package order\ntype Order struct {\n    status string\n}\nfunc (o Order) Status() string { return o.status }\nfunc (o Order) PullEvents() {}\nfunc (o Order) ClearEvents() {}\n"
+    );
+    writeFile(
+      dir,
+      "internal/application/services/order/publish.go",
+      "package ordersvc\n// DomainEventPublisher publishes pulled events.\ntype DomainEventPublisher interface { Publish() }\n"
+    );
+    writeFile(dir, "internal/domain/entities/order/ghost.go", "package order\nconst Ghost = 1\n");
+    const fixed = verifyProject(dir);
+    assert.equal(fixed.ok, true, JSON.stringify(fixed.errors));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("PASS: governance DDD model-integrity checks");
+
+// 13. Model-integrity checks can be disabled via ai-ddd.config.json
+{
+  const dir = makeFixture();
+  try {
+    writeFile(
+      dir,
+      "ai-ddd.config.json",
+      JSON.stringify({
+        schemaVersion: 2,
+        context: { name: "ordering", code: "ORD" },
+        locale: { master: "en", user: "en" },
+        modelIntegrity: { enabled: false },
+        traceability: { scenarioUseCase: false },
+      })
+    );
+    writeFile(
+      dir,
+      "internal/domain/entities/order/order.go",
+      "package order\ntype Order struct {\n    Status string\n}\n"
+    );
+    const report = verifyProject(dir);
+    assert.equal(report.ok, true, JSON.stringify(report.errors));
+    assert.ok(!report.errors.some((e) => e.includes("[Model Integrity]")));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("PASS: governance model-integrity disable configuration");
+
+// 14. Scenario ↔ UseCase 1-to-1: a UT case may reference only one Scenario
+{
+  const dir = makeFixture();
+  try {
+    writeFile(
+      dir,
+      "openspec/specs/ordering/order/spec.md",
+      `# Spec
+### Requirement: REQ-ORD-001 Place order
+The system SHALL place.
+#### Scenario: SCN-ORD-001-01 Valid order
+- **WHEN** valid
+- **THEN** placed
+#### Scenario: SCN-ORD-001-02 Invalid order
+- **WHEN** invalid
+- **THEN** rejected
+#### Scenario: SCN-ORD-001-03 Uncovered order
+- **WHEN** uncovered
+- **THEN** no test
+`
+    );
+    writeFile(
+      dir,
+      "docs/testing/unit/application/order.md",
+      "| ID | Design Element | Technique | Input | Expected | Rationale | Automated Test |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| `UT-ORD-001` | UseCase | BVA | both | ok | `REQ-ORD-001`, `SCN-ORD-001-01`, `SCN-ORD-001-02` | `tests/unit/application.test.mjs` |\n"
+    );
+    writeFile(
+      dir,
+      "src/application/services/order/place_order.ts",
+      "// @implements REQ-ORD-001\nexport function placeOrder() {}\n"
+    );
+    writeFile(dir, "tests/unit/application.test.mjs", 'test("UT-ORD-001 both", () => {});\n');
+    writeFile(
+      dir,
+      "docs/testing/integration/order.md",
+      "| ID | Title | Traces (SCN) | Technique | Preconditions | Steps | Expected | Priority | Automated Test |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| `IT-ORD-001` | Valid | `SCN-ORD-001-01` | E2E | x | y | z | P1 | `scripts/test-integration.sh` |\n| `IT-ORD-002` | Invalid | `SCN-ORD-001-02` | E2E | x | y | z | P1 | `scripts/test-integration.sh` |\n"
+    );
+    writeFile(dir, "scripts/test-integration.sh", "#!/usr/bin/env bash\n# IT-ORD-001 IT-ORD-002\n");
+    const report = analyzeTraceability(dir);
+    assert.equal(report.ok, false);
+    assert.ok(
+      report.errors.some(
+        (e) => e.includes("[Scenario/UseCase Mismatch]") && e.includes("UT-ORD-001") && e.includes("2 Scenarios")
+      ),
+      JSON.stringify(report.errors)
+    );
+    assert.ok(
+      report.errors.some(
+        (e) => e.includes("[Scenario/UseCase Mismatch]") && e.includes("SCN-ORD-001-03") && e.includes("no UT-*")
+      ),
+      JSON.stringify(report.errors)
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("PASS: governance Scenario/UseCase 1-to-1 checks");
