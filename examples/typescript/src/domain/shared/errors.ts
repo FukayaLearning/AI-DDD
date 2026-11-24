@@ -8,18 +8,38 @@ export type DomainErrorCode =
   | "EMPTY_ORDER_LINES"
   | "TOO_MANY_ORDER_LINES"
   | "DUPLICATE_PRODUCT"
-  | "INVALID_ORDER_STATE"
+  | "INVALID_ORDER_STATE";
+
+export type InfrastructureErrorCode =
   | "INSUFFICIENT_STOCK"
   | "PAYMENT_DECLINED"
   | "EXTERNAL_TIMEOUT"
   | "REPOSITORY_ERROR"
-  | "ORDER_NOT_FOUND";
+  | "ORDER_NOT_FOUND"
+  | "CONFLICT"
+  | "EVENT_PUBLISH_FAILED";
 
 export interface DomainError {
+  readonly kind: "domain";
   readonly code: DomainErrorCode;
   readonly message: string;
 }
 
+export interface InfrastructureError {
+  readonly kind: "infrastructure";
+  readonly code: InfrastructureErrorCode;
+  readonly message: string;
+}
+
+export type OrderError = DomainError | InfrastructureError;
+
 export function domainError(code: DomainErrorCode, message: string): DomainError {
-  return { code, message };
+  return { kind: "domain", code, message };
+}
+
+export function infrastructureError(
+  code: InfrastructureErrorCode,
+  message: string
+): InfrastructureError {
+  return { kind: "infrastructure", code, message };
 }

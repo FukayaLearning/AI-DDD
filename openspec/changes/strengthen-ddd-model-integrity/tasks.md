@@ -14,7 +14,7 @@
 
 ## 3. TypeScript リファレンス実装のモデル整合性強化
 
-- [ ] 3.1 ドメイン層を更新する: 値オブジェクトをブランド型またはクラス化して構造的偽造を防ぎ、`Order.create` と `Order.reconstitute` を分離し、`equals` を `OrderId` で実装し、`pullEvents` / `clearEvents` を追加し、`totalAmount` を `Result` 化し、`DomainError` と `InfrastructureError` を分離し、`version` を追加する。対応する `UT-` テストを先に書き、100% C1 coverage を確認する
+- [x] 3.1 ドメイン層を更新する: 値オブジェクトをブランド型またはクラス化して構造的偽造を防ぎ、`Order.create` と `Order.reconstitute` を分離し、`equals` を `OrderId` で実装し、`pullEvents` / `clearEvents` を追加し、`totalAmount` を `Result` 化し、`DomainError` と `InfrastructureError` を分離し、`version` を追加する。対応する `UT-` テストを先に書き、100% C1 coverage を確認する
 - [ ] 3.2 アプリケーション層を更新する: `DomainEventPublisher` ポートを追加し、`save` 成功後の発行とイベントクリアを実装し、確定/取消で遷移後の集約を使用し、`releaseStock` / `refund` による補償と冪等キーを実装する。Scenario ごとの 1-to-1 `UT-` テストを追加する
 - [ ] 3.3 インフラストラクチャ層を更新する: マッパーからイベント永続化を除去し、`reconstitute` を使用し、`version` を含むレコードと競合検出を実装し、`LoggingEventPublisher` と補償用 gateway メソッドを追加する。モックドライバで異常系を含む `UT-` テストを追加する
 - [ ] 3.4 Presentation 層を更新する: `canConfirm` / `canCancel` を参照し、入力解析の失敗を `Result` チャネルに乗せ、1〜5 明細の動的フォームを実装する。Mock × Playwright のブラウザテストを更新し、100% C1 coverage を確認する
