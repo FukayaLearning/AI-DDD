@@ -18,7 +18,10 @@ export interface OrderSummaryDto {
   readonly orderId: string;
   readonly customerId: string;
   readonly status: OrderStatus;
+  readonly version: number;
   readonly total: Money;
+  readonly canConfirm: boolean;
+  readonly canCancel: boolean;
   readonly lines: readonly {
     readonly productId: string;
     readonly quantity: number;
