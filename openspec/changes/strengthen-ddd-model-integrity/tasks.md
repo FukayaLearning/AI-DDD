@@ -9,7 +9,7 @@
 ## 2. `ai-ddd verify` / `ai-ddd trace` のモデル整合性検証
 
 - [x] 2.1 `src/verifier.js` に集約/値オブジェクトのカプセル化、ドメインイベントライフサイクル、ユビキタス言語と識別子の一致の静的検証を追加し、誤検知を設定で無効化できるようにする
-- [ ] 2.2 `src/tracer.js` に Scenario ↔ Application UseCase の 1-to-1 対応検証を追加し、`UT-` ケースが複数 Scenario を参照する場合の違反を報告する
+- [x] 2.2 `src/tracer.js` に Scenario ↔ Application UseCase の 1-to-1 対応検証を追加し、`UT-` ケースが複数 Scenario を参照する場合の違反を報告する
 - [ ] 2.3 `tests/` 配下のプラットフォーム単体テストに、新規検証の正常系・異常系ケースを追加し、`npm test` で通過することを確認する
 
 ## 3. TypeScript リファレンス実装のモデル整合性強化

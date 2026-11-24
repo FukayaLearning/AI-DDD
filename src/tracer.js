@@ -203,6 +203,7 @@ export function analyzeTraceability(targetDir, { includeChanges = false } = {}) 
   const absTarget = path.resolve(targetDir);
   const cfg = loadProjectConfig(absTarget);
   const expectedContextCode = cfg.config?.context?.code || "";
+  const enforceScenarioUseCase = cfg.config?.traceability?.scenarioUseCase !== false;
   const { requirements, scenarios, errors: specErrors } = parseSpecFiles(
     absTarget,
     includeChanges,
@@ -254,6 +255,27 @@ export function analyzeTraceability(targetDir, { includeChanges = false } = {}) 
     );
     if (coveringIts.length === 0) {
       errors.push(`[Uncovered Scenario] ${scn.id} (${scn.file}:${scn.line}) has no IT-* case in integration test specs`);
+    }
+  }
+
+  // Check Scenario ↔ Application UseCase 1-to-1 correspondence
+  if (enforceScenarioUseCase) {
+    for (const scn of scenarios.values()) {
+      const coveringUts = [...testCases.values()].filter(
+        (tc) => tc.level === "UT" && tc.scnRefs.includes(scn.id)
+      );
+      if (coveringUts.length === 0) {
+        errors.push(
+          `[Scenario/UseCase Mismatch] ${scn.id} (${scn.file}:${scn.line}) has no UT-* UseCase test; map each Scenario 1-to-1 to an Application UseCase test`
+        );
+      }
+    }
+    for (const tc of testCases.values()) {
+      if (tc.level === "UT" && tc.scnRefs.length > 1) {
+        errors.push(
+          `[Scenario/UseCase Mismatch] ${tc.id} (${tc.file}:${tc.line}) references ${tc.scnRefs.length} Scenarios; a UT-* case must map 1-to-1 to exactly one Scenario (use IT-* for multi-Scenario coverage)`
+        );
+      }
     }
   }
 
