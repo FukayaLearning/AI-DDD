@@ -3,22 +3,32 @@
 ## Strategic DDD Alignment
 
 - **Bounded Context**: `<bounded-context>`
+- **Core Domain & Subdomains**: <!-- Core Domain owned here; Generic/Supporting Subdomains and their external contexts -->
+- **Distillation**: <!-- Why the Core Domain is separated from Generic/Supporting Subdomains; any Segregated Core / Cohesive Mechanism decisions -->
 - **Ubiquitous Language Updates**: Synced to `docs/domain/ubiquitous-language.md`
-- **Context Map & External Integration**: Synced to `docs/domain/context-map.md` (cross-repo OpenSpec linking: `T.B.D.`)
+- **Context Map & External Integration**: Synced to `docs/domain/context-map.md` (Customer/Supplier direction and downstream ACL documented separately; cross-repo OpenSpec linking: `T.B.D.`)
+- **Shared Kernel**: <!-- Model subset agreed between Bounded Contexts; `domain/shared/` is shared in-context code, not a Shared Kernel -->
 
 ## Tactical Domain Model (`domain/`)
 
-- **Value Objects**: <!-- Immutable validated types returning Result<T, DomainError> -->
+- **Value Objects**: <!-- Immutable, self-validating types returning Result<T, DomainError>; construction cannot bypass validation -->
 - **Entities & Aggregate Roots**: <!-- Aggregate boundary, invariants, state transitions -->
-- **Domain Events**: <!-- Events emitted on aggregate state changes -->
+- **Aggregate Encapsulation**: <!-- How aggregate/value-object state is hidden; which behavior and read-only accessors are exposed -->
+- **Factory: Create vs Reconstitute**: <!-- `create` initializes new aggregates only; `reconstitute` accepts persisted state and validates invariants -->
+- **Entity Identity**: <!-- How entity equality is defined by identity (ID), not all attributes -->
+- **Value Object Validation**: <!-- How each value object enforces immutability and invariants at construction -->
+- **Domain Events**: <!-- Events recorded on aggregate state changes -->
+- **Domain Event Lifecycle**: <!-- pull/clear after save + publisher port, or explicit record-only policy; mapper must not persist transient events -->
+- **Cross-Aggregate Consistency & Compensation**: <!-- One aggregate per transaction; external side-effect compensation, idempotency keys, post-transition aggregate use -->
+- **Optimistic Concurrency**: <!-- Aggregate version and repository conflict detection -->
 - **Domain & Application Ports (Interfaces)**: <!-- OrderRepository owned by domain/repositories/<aggregate>/; external ACL Ports owned by application/ports/<external-or-shared>/ -->
-- **Error Modeling (`Result<T, E>`)**: <!-- Exhaustive DomainError variants (no domain exceptions) -->
+- **Error Modeling (`Result<T, E>`)**: <!-- DomainError (invariants) separated from InfrastructureError (storage/external); no domain exceptions -->
 
 ## 4-Layer Architecture, Module Layout & Infrastructure 3-Part Separation
 
 - **Dependency Rule**: `presentation -> application -> domain <- infrastructure`; `presentation` MUST NOT import `infrastructure`; `main` wires DI.
 - **Tactical-Pattern x Aggregate Layer Layout** (uniform 3-level `<layer>/<tactical-pattern>/<aggregate-or-module>/`; no loose source files at layer roots or directly under pattern folders; aggregate isolation inside `domain/`):
-  - `domain/shared/` (Shared Kernel: `Result`, base `DomainError` only) & `domain/{entities,value_objects,services,repositories}/<aggregate>/` (shared VOs/IDs in `domain/value_objects/shared/`)
+  - `domain/shared/` (shared in-context code: `Result`, base `DomainError` only) & `domain/{entities,value_objects,services,repositories}/<aggregate>/` (shared VOs/IDs in `domain/value_objects/shared/`)
   - `application/{services,ports,dtos}/<aggregate|shared>/`
   - `infrastructure/repositories/<aggregate>/`, `infrastructure/gateways/<external-context>/`, `infrastructure/mappers/<aggregate|external-context>/`, `infrastructure/drivers/<technology>/`
   - `presentation/controllers/<resource>/`, `presentation/views/<resource>/`, `presentation/i18n/` (`en` + user locale catalogs)

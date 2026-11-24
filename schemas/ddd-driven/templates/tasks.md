@@ -5,16 +5,19 @@
 - [ ] 1.1 Update `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md` and verify terminology matches proposal/specs
 - [ ] 1.2 Create or update `docs/testing/unit/<layer>/<module>.md` and `docs/testing/integration/<capability>.md` with `UT-`/`IT-` IDs, techniques, expected results, rationales, and the 7-category abnormal-path checklist
 - [ ] 1.3 Write Domain unit tests (each named with its `UT-` ID) for Value Objects, Aggregate invariants, Domain Services, `Result` error branches, and Domain Events, then implement `domain/{entities,value_objects,services,repositories}/<aggregate>/` to 100% C1 branch coverage
+- [ ] 1.4 Write Domain unit tests for aggregate/value-object encapsulation, `create`/`reconstitute` separation, identity-based entity equality, value-object self-validation, and event pull/clear lifecycle, then implement the corresponding visibility, factory, and event-lifecycle changes
 
 ## 2. Infrastructure Layer 3-Part TDD (100% C1 outside `drivers/`)
 
 - [ ] 2.1 Write unit tests (with `UT-` IDs) for pure Mappers (`infrastructure/mappers/<aggregate|external-context>/`) and ACL converters, then implement them to 100% C1 branch coverage
 - [ ] 2.2 Define minimal branchless `infrastructure/drivers/<technology>/` interfaces and raw driver implementations (verify zero `if`/`switch`/`match` branches)
 - [ ] 2.3 Write unit tests (with `UT-` IDs) using mock drivers for all abnormal paths (timeouts, conflicts, HTTP errors, storage failures) and implement `infrastructure/repositories/<aggregate>/` and `infrastructure/gateways/<external-context>/` to 100% C1 branch coverage
+- [ ] 2.4 Implement optimistic-concurrency version checks in repositories and compensation gateway methods (`releaseStock` / `refund`), with mock-driver tests for version conflicts and compensation failures
 
 ## 3. Application Layer Scenario TDD (100% C1)
 
 - [ ] 3.1 Write Application UseCase tests (with `UT-` IDs) mapped 1-to-1 to every OpenSpec `#### Scenario:` using DI mock ports, then implement `application/{services,ports,dtos}/<aggregate|shared>/` (`@implements REQ-...`) to 100% C1 branch coverage
+- [ ] 3.2 Add `DomainEventPublisher` port, publish pulled events after successful `save` and clear them, use the post-transition aggregate for external calls, and implement compensation/idempotency with `UT-` tests
 
 ## 4. Presentation Layer Mock x Playwright Web UI TDD (100% C1)
 

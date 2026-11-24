@@ -2,7 +2,7 @@
 
 ## 1. `ddd-driven` スキーマ v4 と配布スキルの更新
 
-- [ ] 1.1 `schemas/ddd-driven/schema.yaml` を `version: 4` に更新し、`design.md` テンプレートへ集約カプセル化・Factory 生成/再構築分離・Entity 同一性・値オブジェクト自己検証・ドメインイベントライフサイクル・集約横断の補償/結果整合・Core Domain/Distillation の節を追加し、`spec.md` instruction に実装詳細排除規約を追加し、`tasks.md` テンプレートにモデル整合性 TDD を追加する
+- [x] 1.1 `schemas/ddd-driven/schema.yaml` を `version: 4` に更新し、`design.md` テンプレートへ集約カプセル化・Factory 生成/再構築分離・Entity 同一性・値オブジェクト自己検証・ドメインイベントライフサイクル・集約横断の補償/結果整合・Core Domain/Distillation の節を追加し、`spec.md` instruction に実装詳細排除規約を追加し、`tasks.md` テンプレートにモデル整合性 TDD を追加する
 - [ ] 1.2 `skills/ddd-workflow/SKILL.md` および `.agents/`・`.claude/`・`.github/`・`.hermes/` 配下の配布スキルを更新し、Shared Kernel の定義修正、1 Repository = 1 Bounded Context がプラットフォーム規約である旨、戦略的蒸留、モデル整合性規約を反映する
 - [ ] 1.3 `openspec schema validate ddd-driven` を実行し、スキーマと 5 テンプレートが有効であることを確認する
 
