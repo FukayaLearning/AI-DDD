@@ -374,6 +374,146 @@ function detectBranchesInDriver(rawCode, ext) {
   return [...new Set(findings)];
 }
 
+const TECHNICAL_UL_TERMS = new Set(["Result<T, E>", "Result<T,E>", "DomainError"]);
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isEncapsulationCandidate(rel, typeName) {
+  if (rel.includes("/value_objects/")) return true;
+  if (!rel.includes("/entities/")) return false;
+  return !/(?:Error|Status|Event|Dto|View|Response|Record|Snapshot)$/.test(typeName);
+}
+
+function checkAggregateEncapsulation(domainSources) {
+  const findings = [];
+  for (const { rel, content, ext } of domainSources) {
+    if (ext === ".go") {
+      const structRegex = /type\s+(\w+)\s+struct\s*\{([\s\S]*?)\n\}/g;
+      let m;
+      while ((m = structRegex.exec(content)) !== null) {
+        const typeName = m[1];
+        if (!isEncapsulationCandidate(rel, typeName)) continue;
+        for (const line of m[2].split("\n")) {
+          const field = line.match(/^\s*([A-Z][A-Za-z0-9_]*)\s+/);
+          if (field) {
+            findings.push(
+              `[Model Integrity] ${rel}: ${typeName} exposes exported field '${field[1]}'; use unexported fields and read-only accessors`
+            );
+          }
+        }
+      }
+    } else if (ext === ".rs") {
+      const structRegex = /pub\s+struct\s+(\w+)\s*\{([\s\S]*?)\n\}/g;
+      let m;
+      while ((m = structRegex.exec(content)) !== null) {
+        const typeName = m[1];
+        if (!isEncapsulationCandidate(rel, typeName)) continue;
+        for (const line of m[2].split("\n")) {
+          const field = line.match(/^\s*pub\s+([a-zA-Z_]\w*)\s*:/);
+          if (field) {
+            findings.push(
+              `[Model Integrity] ${rel}: ${typeName} exposes public field '${field[1]}'; use private fields and accessors`
+            );
+          }
+        }
+      }
+    } else if (ext === ".py" && rel.includes("/value_objects/")) {
+      const lines = content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        const deco = lines[i].match(/@dataclass\(([^)]*)\)/);
+        if (!deco || !deco[1].includes("frozen=True")) continue;
+        let classLine = -1;
+        for (let j = i + 1; j < lines.length; j++) {
+          if (/^\s*class\s+(\w+)/.test(lines[j])) {
+            classLine = j;
+            break;
+          }
+          if (lines[j].trim() !== "" && !/^\s*$/.test(lines[j])) break;
+        }
+        if (classLine === -1) continue;
+        const className = lines[classLine].match(/^\s*class\s+(\w+)/)[1];
+        const body = [];
+        for (let j = classLine + 1; j < lines.length; j++) {
+          if (lines[j].trim() !== "" && !/^\s/.test(lines[j])) break;
+          body.push(lines[j]);
+        }
+        const bodyText = body.join("\n");
+        if (!deco[1].includes("init=False") && !bodyText.includes("__post_init__")) {
+          findings.push(
+            `[Model Integrity] ${rel}: value object ${className} has no __post_init__ validation or init=False factory-only construction`
+          );
+        }
+      }
+    } else if (ext === ".ts" && rel.includes("/value_objects/")) {
+      if (/export\s+interface\s+\w+/.test(content)) {
+        findings.push(
+          `[Model Integrity] ${rel}: value objects exported as interfaces can be structurally forged; use classes or branded types`
+        );
+      }
+    }
+  }
+  return findings;
+}
+
+function findRecordOnlyDeclaration(absTarget) {
+  const changesDir = path.join(absTarget, "openspec", "changes");
+  if (!fs.existsSync(changesDir)) return false;
+  return walkFiles(changesDir)
+    .filter((file) => path.basename(file) === "design.md")
+    .some((file) => /record-only|record only|記録のみ|記録するのみ/i.test(fs.readFileSync(file, "utf8")));
+}
+
+function checkEventLifecycle(absTarget, domainSources, allSources) {
+  const recordsEvents = domainSources.some((s) => /\b(?:DomainEvent|Order\w*Event)\b/.test(s.content));
+  if (!recordsEvents) return [];
+  const lifecycle = allSources.some((s) =>
+    /\b(?:pullEvents|clearEvents|PullEvents|ClearEvents|pull_events|clear_events)\b/.test(s.content)
+  );
+  const dispatch = allSources.some((s) =>
+    /\b(?:DomainEventPublisher|EventPublisher|publishEvents|PublishEvents|publish_events|publishEvent)\b/.test(
+      s.content
+    )
+  );
+  if ((lifecycle && dispatch) || findRecordOnlyDeclaration(absTarget)) return [];
+  return [
+    `[Model Integrity] Domain events are recorded but no pull/clear + dispatch path (or explicit record-only declaration) was found; add DomainEventPublisher and pull/clear handling, or declare record-only in design.md`
+  ];
+}
+
+function checkUbiquitousLanguage(absTarget, allSources) {
+  const ulPath = path.join(absTarget, "docs", "domain", "ubiquitous-language.md");
+  if (!fs.existsSync(ulPath)) return [];
+  const terms = [];
+  for (const line of fs.readFileSync(ulPath, "utf8").split("\n")) {
+    const m = line.match(/^\|\s*`([^`]+)`\s*\|/);
+    if (m) terms.push(m[1]);
+  }
+  const sourceText = allSources.map((s) => s.content).join("\n");
+  const findings = [];
+  for (const raw of terms) {
+    const term = raw.replace(/<[^>]*>/g, "").trim();
+    if (!term || TECHNICAL_UL_TERMS.has(raw) || /(?:Port|Repository|Dto|Command|Error)$/.test(term)) continue;
+    const regex = new RegExp(`\\b${escapeRegExp(term)}\\b`);
+    if (!regex.test(sourceText)) {
+      findings.push(
+        `[Model Integrity] Ubiquitous-language term '${raw}' does not appear as a domain identifier in the source tree`
+      );
+    }
+  }
+  return findings;
+}
+
+function verifyModelIntegrity(absTarget, domainSources, allSources, cfg) {
+  const rules = cfg?.rules ?? {};
+  const findings = [];
+  if (rules.encapsulation !== false) findings.push(...checkAggregateEncapsulation(domainSources));
+  if (rules.eventLifecycle !== false) findings.push(...checkEventLifecycle(absTarget, domainSources, allSources));
+  if (rules.ubiquitousLanguage !== false) findings.push(...checkUbiquitousLanguage(absTarget, allSources));
+  return findings;
+}
+
 export function verifyProject(targetDir) {
   const absTarget = path.resolve(targetDir);
   const errors = [];
@@ -431,6 +571,8 @@ export function verifyProject(targetDir) {
   let filesChecked = 0;
   let driverFilesChecked = 0;
   const dirFileCounts = new Map();
+  const allSources = [];
+  const domainSources = [];
 
   for (const file of allFiles) {
     const rel = path.relative(absTarget, file).replace(/\\/g, "/");
@@ -448,6 +590,8 @@ export function verifyProject(targetDir) {
     const relDir = path.posix.dirname(rel);
     dirFileCounts.set(relDir, (dirFileCounts.get(relDir) || 0) + 1);
     const content = fs.readFileSync(file, "utf8");
+    allSources.push({ rel, content, ext });
+    if (layer === "domain") domainSources.push({ rel, content, ext });
 
     // Structure rules: tactical-pattern whitelist, no loose files, & aggregate isolation
     const subpath = detectLayerSubpath(rel);
@@ -553,6 +697,12 @@ export function verifyProject(targetDir) {
     } catch (e) {
       errors.push(`Invalid JSON in c1-coverage.config.json: ${e.message}`);
     }
+  }
+
+  // 3b. DDD model-integrity checks (encapsulation, event lifecycle, ubiquitous language)
+  const modelIntegrityCfg = loadedCfg.config?.modelIntegrity;
+  if (modelIntegrityCfg?.enabled !== false) {
+    v2Sink.push(...verifyModelIntegrity(absTarget, domainSources, allSources, modelIntegrityCfg));
   }
 
   // 4. Translations & UI message catalogs

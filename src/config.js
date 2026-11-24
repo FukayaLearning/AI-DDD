@@ -63,6 +63,17 @@ export function buildProjectConfig({
     coverage: {
       configFile: "c1-coverage.config.json",
     },
+    modelIntegrity: {
+      enabled: true,
+      rules: {
+        encapsulation: true,
+        eventLifecycle: true,
+        ubiquitousLanguage: true,
+      },
+    },
+    traceability: {
+      scenarioUseCase: true,
+    },
   };
 }
 
@@ -93,6 +104,17 @@ export function loadProjectConfig(targetDir) {
         },
         coverage: {
           configFile: raw.coverage?.configFile || "c1-coverage.config.json",
+        },
+        modelIntegrity: {
+          enabled: raw.modelIntegrity?.enabled !== false,
+          rules: {
+            encapsulation: raw.modelIntegrity?.rules?.encapsulation !== false,
+            eventLifecycle: raw.modelIntegrity?.rules?.eventLifecycle !== false,
+            ubiquitousLanguage: raw.modelIntegrity?.rules?.ubiquitousLanguage !== false,
+          },
+        },
+        traceability: {
+          scenarioUseCase: raw.traceability?.scenarioUseCase !== false,
         },
       },
       error: null,
