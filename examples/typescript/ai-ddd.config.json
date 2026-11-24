@@ -15,9 +15,9 @@
     "configFile": "c1-coverage.config.json"
   },
   "modelIntegrity": {
-    "enabled": false
+    "enabled": true
   },
   "traceability": {
-    "scenarioUseCase": false
+    "scenarioUseCase": true
   }
 }

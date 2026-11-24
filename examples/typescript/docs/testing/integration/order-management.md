@@ -14,6 +14,7 @@
 | `IT-ORD-008` | Place order fails on persistence error | `SCN-ORD-001-03` | Fault injection | Server configured with read-only data directory | POST `/orders` with valid payload | HTTP 422 with `REPOSITORY_ERROR` and no order file created | P1 | `scripts/test-integration.sh` |
 | `IT-ORD-009` | Get unknown order returns 404 | `SCN-ORD-002-02`, `SCN-ORD-004-01` | Equivalence partitioning | Real server running | GET `/orders/NO-SUCH` | HTTP 404 with `ORDER_NOT_FOUND` | P2 | `scripts/test-integration.sh` |
 | `IT-ORD-010` | Localized Web UI rendering (`ja` & `en`) | `SCN-ORD-004-01` | Equivalence partitioning | Servers started with default `ja` and `APP_LOCALE=en` | GET `/` on each server | `<html lang="ja">` with Japanese labels vs `<html lang="en">` with English labels | P2 | `scripts/test-integration.sh` |
+| `IT-ORD-011` | Multiple order lines (1..5) | `SCN-ORD-001-01` | Boundary value | Real server running with writable data dir | POST `/orders` with two product lines | HTTP 200 with the summed total rendered and both lines persisted | P1 | `scripts/test-integration.sh` |
 
 ## Abnormal-Path Checklist
 
@@ -23,6 +24,6 @@
 | Invalid state transition | `IT-ORD-003` | |
 | External dependency failure (timeout / declined / unavailable) | `IT-ORD-004`, `IT-ORD-005`, `IT-ORD-006`, `IT-ORD-007` | |
 | Persistence / storage failure | `IT-ORD-008` | |
-| Duplicate / concurrent conflict | | Single-process local KV file storage without concurrent multi-writer locking |
+| Duplicate / concurrent conflict | | Single-process local KV file storage without concurrent multi-writer locking; version conflicts are covered by `UT-ORD-066` |
 | Target not found | `IT-ORD-009` | |
 | Locale-specific rendering | `IT-ORD-010` | |

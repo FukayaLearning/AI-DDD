@@ -6,21 +6,22 @@ The Ordering Bounded Context needs a complete order lifecycle capability (creati
 
 ## Bounded Context & Ubiquitous Language
 
-- **Bounded Context**: `ordering` (1 repository = 1 Bounded Context)
-- **External Contexts**: `inventory` and `payment` reside in separate repositories (`T.B.D.` for cross-repo OpenSpec linking), accessed via Anti-Corruption Layer (ACL) ports.
+- **Bounded Context**: `ordering` (platform convention: 1 repository = 1 Bounded Context)
+- **Core Domain**: `ordering`; `inventory` and `payment` are Generic/Supporting Subdomains in separate repositories (`T.B.D.` for cross-repo OpenSpec linking), accessed through Anti-Corruption Layer ports.
+- **Shared Kernel**: none currently.
 - **New / Updated Terms** (synced with `docs/domain/ubiquitous-language.md`):
-  - `Order`: Aggregate root managing `OrderLine` items and lifecycle (`Draft` -> `Confirmed` -> `Cancelled`).
+  - `Order`: Aggregate root managing `OrderLine` items, lifecycle (`Draft` -> `Confirmed` -> `Cancelled`), and an optimistic-concurrency `version`.
   - `OrderId`, `CustomerId`, `ProductId`: Validated non-empty identifier Value Objects.
   - `Money`: Non-negative integer minor-unit amount paired with `Currency` (`JPY` | `USD`).
   - `Quantity`: Positive integer item count constrained between 1 and 100.
-  - `OrderLine`: Line entity holding `ProductId`, `Quantity`, and unit `Money`.
-  - `OrderConfirmedEvent`, `OrderCancelledEvent`: Domain events emitted upon aggregate transitions.
+  - `OrderLine`: Aggregate-internal Value Object holding `ProductId`, `Quantity`, and unit `Money`; no identity of its own.
+  - `OrderConfirmedEvent`, `OrderCancelledEvent`: Domain events recorded on aggregate transitions and published after a successful save.
 
 ## What Changes
 
-- Introduce order creation, confirmation (inventory + payment orchestration), cancellation, and detail lookup capabilities.
-- Add 4-layer DDD implementation (`domain`, `application`, `infrastructure`, `presentation`) using `Result<T, E>` error values.
-- Expose an SSR HTML Web UI for creating, inspecting, confirming, and cancelling orders.
+- Introduce order creation, confirmation (inventory + payment orchestration with compensation), cancellation (with inventory release and refund for confirmed orders), and detail lookup capabilities.
+- Add 4-layer DDD implementation (`domain`, `application`, `infrastructure`, `presentation`) using separated `DomainError` / `InfrastructureError` values.
+- Expose a Web UI for creating (1..5 lines), inspecting, confirming, and cancelling orders.
 
 ## Capabilities
 
@@ -32,8 +33,8 @@ The Ordering Bounded Context needs a complete order lifecycle capability (creati
 
 ## Impact
 
-- **Domain Model**: `Order`, `OrderLine`, `OrderId`, `CustomerId`, `ProductId`, `Money`, `Quantity`, `OrderRepository`, `InventoryPort`, `PaymentPort`, `DomainError`.
-- **Application UseCases**: `OrderApplicationService` (`placeOrder`, `confirmOrder`, `cancelOrder`, `getOrder`).
-- **Infrastructure**: `OrderMapper`, `DriverOrderRepository`, `InventoryGateway`, `PaymentGateway`, branchless `drivers/` (`KvDriver`, `HttpJsonDriver`).
-- **Presentation**: SSR Web UI routes (`GET /`, `GET /orders/:id`, `POST /orders`, `POST /orders/:id/confirm`, `POST /orders/:id/cancel`).
+- **Domain Model**: `Order`, `OrderLine`, `OrderId`, `CustomerId`, `ProductId`, `Money`, `Quantity`, `OrderRepository`, `DomainError`, `InfrastructureError`.
+- **Application UseCases**: `OrderApplicationService` (`placeOrder`, `confirmOrder`, `cancelOrder`, `getOrder`) and `DomainEventPublisher`.
+- **Infrastructure**: `OrderMapper`, `DriverOrderRepository`, `InventoryGateway`, `PaymentGateway`, `LoggingEventPublisher`, branchless `drivers/`.
+- **Presentation**: Web UI routes (`GET /`, `GET /orders/:id`, `POST /orders`, `POST /orders/:id/confirm`, `POST /orders/:id/cancel`).
 - **Distribution / Integration**: Binary/process server startup integrating real file KV and HTTP drivers.

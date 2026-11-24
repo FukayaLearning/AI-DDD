@@ -23,7 +23,9 @@ export function parseTranslationHeader(content) {
 
 export function resolveMasterForTranslation(absTarget, absTranslation) {
   const rel = path.relative(absTarget, absTranslation).replace(/\\/g, "/");
-  const changeMatch = rel.match(/^(openspec\/changes\/[^/]+)\/i18n\/([^/]+)\/(.+)$/);
+  const changeMatch = rel.match(
+    /^(openspec\/changes\/(?:archive\/[^/]+|[^/]+))\/i18n\/([^/]+)\/(.+)$/
+  );
   if (changeMatch) {
     const [, changeDir, locale, innerRel] = changeMatch;
     return {

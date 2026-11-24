@@ -2,6 +2,7 @@ import path from "node:path";
 import { OrderApplicationService } from "./application/services/order/order_service.ts";
 import { InventoryGateway } from "./infrastructure/gateways/inventory/inventory_gateway.ts";
 import { PaymentGateway } from "./infrastructure/gateways/payment/payment_gateway.ts";
+import { LoggingEventPublisher } from "./infrastructure/gateways/events/logging_event_publisher.ts";
 import { FetchHttpJsonDriver } from "./infrastructure/drivers/http/http_driver.ts";
 import { FileKvDriver } from "./infrastructure/drivers/kv/kv_driver.ts";
 import { DriverOrderRepository } from "./infrastructure/repositories/order/driver_order_repository.ts";
@@ -20,7 +21,8 @@ export function createOrderingApp(options: {
   const repo = new DriverOrderRepository(kvDriver);
   const inventory = new InventoryGateway(httpDriver, options.inventoryUrl);
   const payment = new PaymentGateway(httpDriver, options.paymentUrl);
-  const useCases = new OrderApplicationService(repo, inventory, payment);
+  const events = new LoggingEventPublisher();
+  const useCases = new OrderApplicationService(repo, inventory, payment, events);
   return { useCases };
 }
 

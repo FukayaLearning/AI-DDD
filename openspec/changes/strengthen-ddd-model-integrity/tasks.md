@@ -18,7 +18,7 @@
 - [x] 3.2 アプリケーション層を更新する: `DomainEventPublisher` ポートを追加し、`save` 成功後の発行とイベントクリアを実装し、確定/取消で遷移後の集約を使用し、`releaseStock` / `refund` による補償と冪等キーを実装する。Scenario ごとの 1-to-1 `UT-` テストを追加する
 - [x] 3.3 インフラストラクチャ層を更新する: マッパーからイベント永続化を除去し、`reconstitute` を使用し、`version` を含むレコードと競合検出を実装し、`LoggingEventPublisher` と補償用 gateway メソッドを追加する。モックドライバで異常系を含む `UT-` テストを追加する
 - [x] 3.4 Presentation 層を更新する: `canConfirm` / `canCancel` を参照し、入力解析の失敗を `Result` チャネルに乗せ、1〜5 明細の動的フォームを実装する。Mock × Playwright のブラウザテストを更新し、100% C1 coverage を確認する
-- [ ] 3.5 `docs/domain/ubiquitous-language.md`・`context-map.md`・仕様・設計・トレーサビリティ・アーカイブ（`test-plan.md`、`REQ-`/`SCN-` ID、`i18n/ja/`）を更新し、`ai-ddd verify --target examples/typescript` と `ai-ddd trace --target examples/typescript --check` および全テストを通過させる
+- [x] 3.5 `docs/domain/ubiquitous-language.md`・`context-map.md`・仕様・設計・トレーサビリティ・アーカイブ（`test-plan.md`、`REQ-`/`SCN-` ID、`i18n/ja/`）を更新し、`ai-ddd verify --target examples/typescript` と `ai-ddd trace --target examples/typescript --check` および全テストを通過させる
 
 ## 4. Python リファレンス実装のモデル整合性強化
 

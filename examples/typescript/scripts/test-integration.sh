@@ -67,6 +67,18 @@ try {
   assert.equal(cancelRes.status, 200);
   assert.match(await cancelRes.text(), /Cancelled/);
   assert.ok(fs.existsSync(path.join(dataDir, "ORD-INT-1.json")));
+  const stored = JSON.parse(fs.readFileSync(path.join(dataDir, "ORD-INT-1.json"), "utf8"));
+  assert.equal(stored.version, 3);
+  assert.equal("events" in stored, false);
+
+  // IT-ORD-011: Multiple order lines (1..5) are supported
+  const multiRes = await fetch(baseUrl + "/orders", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: "orderId=ORD-INT-2&customerId=CUST-INT&productId=SKU-1&quantity=1&unitAmount=100&currency=JPY&productId=SKU-2&quantity=2&unitAmount=200&currency=JPY",
+  });
+  assert.equal(multiRes.status, 200);
+  assert.match(await multiRes.text(), /500 JPY/);
 
   // IT-ORD-003: Invalid state transition on Cancelled order
   const reConfirm = await fetch(baseUrl + "/orders/ORD-INT-1/confirm", { method: "POST" });
