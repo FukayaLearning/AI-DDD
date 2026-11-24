@@ -29,5 +29,7 @@ export const jaMessages: OrderMessages = {
     INSUFFICIENT_STOCK: "在庫が不足しています",
     PAYMENT_DECLINED: "決済が拒否されました",
     EXTERNAL_TIMEOUT: "外部サービスに接続できません",
+    CONFLICT: "注文が同時に更新されました",
+    EVENT_PUBLISH_FAILED: "ドメインイベントを発行できませんでした",
   },
 };

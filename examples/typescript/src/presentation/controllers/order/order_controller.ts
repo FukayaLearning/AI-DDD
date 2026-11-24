@@ -1,6 +1,8 @@
 import http from "node:http";
 import type { OrderUseCases } from "../../../application/services/order/order_service.ts";
 import type { Currency } from "../../../domain/value_objects/shared/money.ts";
+import type { OrderError } from "../../../domain/shared/errors.ts";
+import type { PlaceOrderLineInput } from "../../../application/dtos/order/order_dto.ts";
 import { enMessages, type OrderMessages } from "../../i18n/en.ts";
 import {
   escapeHtml,
@@ -23,6 +25,47 @@ function sendHtml(res: http.ServerResponse, status: number, html: string): void 
   res.end(html);
 }
 
+function parseLines(form: URLSearchParams): PlaceOrderLineInput[] {
+  const productIds = form.getAll("productId");
+  const quantities = form.getAll("quantity");
+  const unitAmounts = form.getAll("unitAmount");
+  const currencies = form.getAll("currency");
+  const count = Math.max(
+    productIds.length,
+    quantities.length,
+    unitAmounts.length,
+    currencies.length
+  );
+  const lines: PlaceOrderLineInput[] = [];
+  for (let i = 0; i < count; i++) {
+    lines.push({
+      productId: productIds[i] ?? "",
+      quantity: Number(quantities[i] ?? "0"),
+      unitAmount: Number(unitAmounts[i] ?? "0"),
+      currency: (currencies[i] ?? "") as Currency,
+    });
+  }
+  return lines;
+}
+
+function renderErrorPage(
+  res: http.ServerResponse,
+  status: number,
+  messages: OrderMessages,
+  title: string,
+  error: OrderError
+): void {
+  sendHtml(
+    res,
+    status,
+    layout(
+      messages.locale,
+      title,
+      `<div data-testid="error-banner">${escapeHtml(error.code)}: ${escapeHtml(localizeError(messages, error))}</div>`
+    )
+  );
+}
+
 // @implements REQ-ORD-004
 export function createOrderWebHandler(useCases: OrderUseCases, messages: OrderMessages = enMessages) {
   return async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
@@ -38,15 +81,7 @@ export function createOrderWebHandler(useCases: OrderUseCases, messages: OrderMe
       if (detailMatch) {
         const result = await useCases.getOrder(decodeURIComponent(detailMatch[1]));
         if (!result.ok) {
-          sendHtml(
-            res,
-            404,
-            layout(
-              messages.locale,
-              messages.orderNotFoundTitle,
-              `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(localizeError(messages, result.error))}</div>`
-            )
-          );
+          renderErrorPage(res, 404, messages, messages.orderNotFoundTitle, result.error);
           return;
         }
         sendHtml(res, 200, renderOrderDetailPage(result.value, null, messages));
@@ -60,16 +95,9 @@ export function createOrderWebHandler(useCases: OrderUseCases, messages: OrderMe
       if (urlPath === "/orders") {
         const form = await readFormParams(req);
         const result = await useCases.placeOrder({
-          orderId: form.get("orderId") as string,
-          customerId: form.get("customerId") as string,
-          lines: [
-            {
-              productId: form.get("productId") as string,
-              quantity: Number(form.get("quantity")),
-              unitAmount: Number(form.get("unitAmount")),
-              currency: form.get("currency") as Currency,
-            },
-          ],
+          orderId: form.get("orderId") ?? "",
+          customerId: form.get("customerId") ?? "",
+          lines: parseLines(form),
         });
         if (!result.ok) {
           sendHtml(res, 422, renderCreateOrderPage(result.error, messages));
@@ -86,15 +114,7 @@ export function createOrderWebHandler(useCases: OrderUseCases, messages: OrderMe
         if (!result.ok) {
           const current = await useCases.getOrder(orderId);
           if (!current.ok) {
-            sendHtml(
-              res,
-              404,
-              layout(
-                messages.locale,
-                messages.orderNotFoundTitle,
-                `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(localizeError(messages, result.error))}</div>`
-              )
-            );
+            renderErrorPage(res, 404, messages, messages.orderNotFoundTitle, result.error);
             return;
           }
           sendHtml(res, 422, renderOrderDetailPage(current.value, result.error, messages));
@@ -111,15 +131,7 @@ export function createOrderWebHandler(useCases: OrderUseCases, messages: OrderMe
         if (!result.ok) {
           const current = await useCases.getOrder(orderId);
           if (!current.ok) {
-            sendHtml(
-              res,
-              404,
-              layout(
-                messages.locale,
-                messages.orderNotFoundTitle,
-                `<div data-testid="error-banner">${escapeHtml(result.error.code)}: ${escapeHtml(localizeError(messages, result.error))}</div>`
-              )
-            );
+            renderErrorPage(res, 404, messages, messages.orderNotFoundTitle, result.error);
             return;
           }
           sendHtml(res, 422, renderOrderDetailPage(current.value, result.error, messages));

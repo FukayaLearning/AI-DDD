@@ -1,5 +1,5 @@
 import type { OrderSummaryDto } from "../../../application/dtos/order/order_dto.ts";
-import type { DomainError } from "../../../domain/shared/errors.ts";
+import type { OrderError } from "../../../domain/shared/errors.ts";
 import { enMessages, type OrderMessages } from "../../i18n/en.ts";
 
 export function escapeHtml(text: string): string {
@@ -10,7 +10,7 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function localizeError(messages: OrderMessages, error: DomainError): string {
+export function localizeError(messages: OrderMessages, error: OrderError): string {
   return messages.errorMessages[error.code] ?? error.message;
 }
 
@@ -22,7 +22,16 @@ export function layout(locale: string, title: string, content: string): string {
 </html>`;
 }
 
-export function renderCreateOrderPage(error: DomainError | null, messages: OrderMessages = enMessages): string {
+function renderLineRow(): string {
+  return `<div class="order-line">
+  <input name="productId" placeholder="Product ID" />
+  <input name="quantity" type="number" value="1" />
+  <input name="unitAmount" type="number" value="1000" />
+  <select name="currency"><option value="JPY">JPY</option><option value="USD">USD</option></select>
+</div>`;
+}
+
+export function renderCreateOrderPage(error: OrderError | null, messages: OrderMessages = enMessages): string {
   const banner = error
     ? `<div data-testid="error-banner">${escapeHtml(error.code)}: ${escapeHtml(localizeError(messages, error))}</div>`
     : "";
@@ -34,18 +43,27 @@ ${banner}
 <form method="POST" action="/orders">
   <input name="orderId" placeholder="Order ID" />
   <input name="customerId" placeholder="Customer ID" />
-  <input name="productId" placeholder="Product ID" />
-  <input name="quantity" type="number" value="1" />
-  <input name="unitAmount" type="number" value="1000" />
-  <select name="currency"><option value="JPY">JPY</option><option value="USD">USD</option></select>
+  <div id="order-lines">${renderLineRow()}</div>
+  <button type="button" data-testid="add-line-btn" onclick="addOrderLine()">Add line</button>
   <button type="submit" data-testid="place-order-btn">${escapeHtml(messages.placeOrderButton)}</button>
-</form>`
+</form>
+<script>
+function addOrderLine() {
+  var container = document.getElementById("order-lines");
+  if (container.querySelectorAll(".order-line").length >= 5) return;
+  var row = container.querySelector(".order-line").cloneNode(true);
+  row.querySelectorAll("input").forEach(function (input) {
+    input.value = input.type === "number" ? (input.name === "quantity" ? "1" : "1000") : "";
+  });
+  container.appendChild(row);
+}
+</script>`
   );
 }
 
 export function renderOrderDetailPage(
   order: OrderSummaryDto,
-  error: DomainError | null,
+  error: OrderError | null,
   messages: OrderMessages = enMessages
 ): string {
   const banner = error
@@ -57,8 +75,8 @@ export function renderOrderDetailPage(
         `<tr><td>${escapeHtml(l.productId)}</td><td>${l.quantity}</td><td>${l.unitPrice.amount} ${l.unitPrice.currency}</td></tr>`
     )
     .join("");
-  const confirmDisabled = order.status === "Draft" ? "" : " disabled";
-  const cancelDisabled = order.status === "Cancelled" ? " disabled" : "";
+  const confirmDisabled = order.canConfirm ? "" : " disabled";
+  const cancelDisabled = order.canCancel ? "" : " disabled";
 
   return layout(
     messages.locale,

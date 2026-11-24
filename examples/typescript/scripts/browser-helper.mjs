@@ -130,6 +130,16 @@ export async function launchHeadlessBrowser() {
         sessionId
       );
     },
+    async click(selector) {
+      await send(
+        "Runtime.evaluate",
+        {
+          expression: `(() => { document.querySelector(${JSON.stringify(selector)}).click(); })()`,
+          returnByValue: true,
+        },
+        sessionId
+      );
+    },
     async clickAndWait(selector) {
       const loaded = waitForLoad();
       await send(

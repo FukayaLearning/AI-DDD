@@ -43,5 +43,7 @@ export const enMessages: OrderMessages = {
     INSUFFICIENT_STOCK: "Insufficient stock",
     PAYMENT_DECLINED: "Payment was declined",
     EXTERNAL_TIMEOUT: "External service is unavailable",
+    CONFLICT: "The order was modified concurrently",
+    EVENT_PUBLISH_FAILED: "Domain events could not be published",
   },
 };
