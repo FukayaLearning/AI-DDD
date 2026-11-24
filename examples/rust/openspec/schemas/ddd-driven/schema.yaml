@@ -1,6 +1,6 @@
 name: ddd-driven
-version: 3
-description: OpenSpec + DDD 5-stage workflow (proposal -> specs -> design -> test-plan -> tasks) with 1-repo-1-Bounded-Context, tactical-pattern x aggregate folder layout, Result<T, E>, 3-part Infrastructure, Mock+Playwright C1 100% coverage, and 3-role multi-agent orchestration.
+version: 4
+description: OpenSpec + DDD 5-stage workflow (proposal -> specs -> design -> test-plan -> tasks) with 1-repo-1-Bounded-Context as a platform convention, tactical-pattern x aggregate folder layout, encapsulated aggregates/value objects, create/reconstitute factories, identity-based entity equality, domain-event lifecycle, Result<T, E>, 3-part Infrastructure, Mock+Playwright C1 100% coverage, and 3-role multi-agent orchestration.
 artifacts:
   - id: proposal
     generates: proposal.md
@@ -9,8 +9,10 @@ artifacts:
     instruction: |
       Create the proposal document that establishes WHY this change is needed within this repository's single Bounded Context.
 
-      Strategic DDD Rule (1 Repository = 1 Bounded Context):
-      - This repository owns exactly ONE Bounded Context. External contexts reside in separate repositories (cross-repo OpenSpec linking is T.B.D.).
+      Strategic DDD Rules:
+      - Platform convention: this repository owns exactly ONE Bounded Context. External contexts reside in separate repositories (cross-repo OpenSpec linking is T.B.D.). This is a platform convention, not a universal DDD rule.
+      - Identify the repository's Core Domain, distinguish Generic/Supporting Subdomains where applicable, and record distillation decisions in `docs/domain/context-map.md`.
+      - Shared Kernel means a model subset agreed between Bounded Contexts; `domain/shared/` is shared in-context code, not a Shared Kernel.
       - Check `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md` before drafting.
       - Record any new or modified Ubiquitous Language terms so all specs, code, and tests use identical terminology.
 
@@ -47,7 +49,7 @@ artifacts:
       - Each requirement: `### Requirement: REQ-<CTX>-<NNN> <name>` using SHALL/MUST (keep description <= 500 chars).
       - Each scenario MUST use exactly 4 hashtags (`#### Scenario: SCN-<CTX>-<NNN>-<NN> <name>`) with `- **GIVEN**`/`- **WHEN**` and `- **THEN**` steps.
       - Never reuse retired IDs.
-      - Avoid internal class names, framework names, or SQL/HTTP details in specs; keep specs behavior-focused and testable.
+      - Specs MUST NOT contain internal class names, error codes, framework names, SQL/HTTP details, or rendering technology; describe observable domain outcomes strictly in Ubiquitous Language.
 
       Localization Rule (Master = `en`):
       - Author `specs/<bounded-context>/<capability>/spec.md` in English. If `locale.user` != `en`, place translation at `i18n/<locale>/specs/<bounded-context>/<capability>/spec.md` (never as a sibling inside `specs/`, which OpenSpec rejects) and stamp it.
@@ -64,10 +66,19 @@ artifacts:
       Mandatory DDD & Verification Design Rules:
       1. **Strategic DDD Alignment**:
          - Confirm sync with `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md`.
+         - Identify the Core Domain and Generic/Supporting Subdomains, and record distillation decisions.
+         - Define Shared Kernel only as a model subset agreed between Bounded Contexts; `domain/shared/` is shared in-context code.
          - External Bounded Context integrations remain in separate repositories (mark cross-repo spec federation as `T.B.D.`).
-      2. **Tactical Domain Model & Result<T, E>**:
+      2. **Tactical Domain Model, Encapsulation & Result<T, E>**:
          - Specify Value Objects, Entities, Aggregate Roots (invariants), Domain Events, Domain Services, and Repository/ACL Ports.
-         - Model ALL expected domain and infrastructure failures using `Result<T, E>` (no throwing domain exceptions for business or I/O errors), so every error path is an explicit C1 branch.
+         - **Aggregate encapsulation**: aggregate and value-object state MUST NOT be mutable from outside the boundary; expose behavior and read-only accessors only.
+         - **Factory separation**: `create` initializes new aggregates (e.g., `Draft`, `version = 0`, empty events) and MUST NOT accept post-transition state; `reconstitute` accepts persisted state and validates invariants.
+         - **Entity identity**: entity equality MUST be defined by identity (ID), not by all attributes. Value objects use attribute equality.
+         - **Value-object validation**: value objects MUST be immutable and self-validating; construction MUST NOT bypass invariant checks.
+         - **Domain-event lifecycle**: record events on the aggregate, pull/clear them after a successful `save`, and publish through a port; mappers MUST NOT persist transient events. If the project intentionally records events without publishing, the design MUST declare that policy explicitly.
+         - **Cross-aggregate consistency**: one aggregate per transaction; external side effects require compensation, idempotency keys, and use of the post-transition aggregate.
+         - **Optimistic concurrency**: aggregates carry a version and repositories reject stale saves.
+         - Separate `DomainError` (invariant violations) from infrastructure errors (storage/external failures), and model all expected failures as `Result<T, E>` (no domain exceptions for business or I/O errors), so every error path is an explicit C1 branch.
       3. **Layer-First 4-Layer Architecture (Tactical Pattern x Aggregate)**:
          - `domain`: Zero dependencies on outer layers or I/O libraries. Split into `domain/shared/` (`Result<T, E>`, base `DomainError` only) and `domain/{entities,value_objects,services,repositories}/<aggregate>/`; cross-aggregate identifiers/shared VOs live in `domain/value_objects/shared/`.
          - `application`: UseCases taking Repository/ACL ports via DI, returning `Result<T, E>`. Depends only on `domain`. Split into `application/{services,ports,dtos}/<aggregate|shared>/`.
@@ -119,19 +130,21 @@ artifacts:
 
       Mandatory Task Groups & Sequence:
       1. **Strategic Docs & Domain Layer TDD (100% C1)**:
-         - Sync `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md`.
+         - Sync `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md`, including Core Domain / Generic Subdomain / Distillation decisions.
          - Write Domain unit tests (Value Objects, Aggregate invariants, `Result` error variants, Domain Events) first, then implement Domain until tests pass with 100% C1 branch coverage.
+         - Add tests for aggregate/value-object encapsulation, `create`/`reconstitute` separation, identity-based entity equality, value-object self-validation, and event pull/clear lifecycle before implementation.
       2. **Infrastructure Layer 3-Part TDD (100% C1 outside `drivers/`)**:
          - Implement pure Mapper/ACL converters and unit test all branches.
          - Define minimal branchless `drivers/` interface & raw driver implementation (no `if/switch/match`).
          - Write Repository/ACL unit tests with mock drivers covering all abnormal paths (timeouts, declined/conflict, invalid payloads, storage errors) first, then implement Repository/ACL to 100% C1.
       3. **Application Layer Scenario TDD (100% C1)**:
          - Map each OpenSpec `#### Scenario:` 1-to-1 to an Application UseCase test using DI-injected mock Repository/ACL ports, then implement UseCases to 100% C1.
+         - Test event publication after successful `save`, compensation (`releaseStock`/`refund`), idempotency keys, post-transition aggregate use, and optimistic-concurrency conflicts.
       4. **Presentation Layer Mock x Playwright Web UI TDD (100% C1)**:
          - Launch the real Presentation Web server with DI-injected Mock UseCases under coverage instrumentation.
          - Execute Playwright/headless Chromium tests across every normal, validation-error, domain-error, system-error, and 404 branch, asserting rendered DOM and 100% Presentation C1 branch coverage.
       5. **Distribution & Integration Verification**:
-         - Run `ai-ddd verify` (layer dependencies, zero inline coverage ignores, branchless `drivers/`).
+         - Run `ai-ddd verify` (layer dependencies, zero inline coverage ignores, branchless `drivers/`, and DDD model-integrity checks).
          - Run distribution-specific integration test (`docker` / `binary` / `library`) verifying `drivers/` + `main`.
       6. **Multi-Agent Execution & Zero-Context Review**:
          - Delegate mechanical build/test/coverage runs to a lightweight execution subagent (`flash`/`flash_lite`).

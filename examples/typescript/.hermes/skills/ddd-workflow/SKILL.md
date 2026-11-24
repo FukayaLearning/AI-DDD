@@ -9,13 +9,23 @@ Use this skill whenever designing, implementing, testing, or verifying changes i
 
 ## 1. Strategic & Structural Rules
 
-1. **1 Repository = 1 Bounded Context**:
+1. **1 Repository = 1 Bounded Context (platform convention)**:
+   - This is a platform convention, not a universal DDD rule. Evans defines a Bounded Context as a model boundary, which may span multiple repositories or deployments.
+   - Identify the repository's Core Domain, distinguish Generic/Supporting Subdomains, and record distillation decisions in `docs/domain/context-map.md`.
+   - Shared Kernel means a model subset agreed between Bounded Contexts, with changes negotiated across teams. `domain/shared/` is shared in-context code, not a Shared Kernel.
    - External Bounded Contexts live in separate repositories (cross-repo OpenSpec linking is `T.B.D.`).
    - Keep `docs/domain/ubiquitous-language.md` and `docs/domain/context-map.md` synchronized on every change.
    - Store specifications under `openspec/specs/<bounded-context>/<capability>/spec.md`.
 2. **Tactical-Pattern x Aggregate 4-Layer Architecture**:
    - Use the uniform 3-level layout `<layer>/<tactical-pattern>/<aggregate-or-module>/`. **No loose source files at layer roots or directly under a tactical pattern folder** (except `domain/shared/` and `presentation/i18n/`; language module declarations like `mod.rs`, `__init__.py`, `lib.rs` are exempt).
-   - `domain/`: Zero outer-layer or I/O dependencies. Split into `domain/shared/` (Shared Kernel: `Result<T, E>`, base `DomainError` only) and `domain/{entities,value_objects,services,repositories}/<aggregate>/` (cross-aggregate IDs/shared VOs in `domain/value_objects/shared/`). **Aggregates MUST NOT directly depend on other aggregates**; reference across aggregates via IDs in `domain/value_objects/shared/`.
+   - `domain/`: Zero outer-layer or I/O dependencies. Split into `domain/shared/` (shared in-context code: `Result<T, E>`, base `DomainError` only) and `domain/{entities,value_objects,services,repositories}/<aggregate>/` (cross-aggregate IDs/shared VOs in `domain/value_objects/shared/`). **Aggregates MUST NOT directly depend on other aggregates**; reference across aggregates via IDs in `domain/value_objects/shared/`.
+   - **Aggregate encapsulation**: aggregate and value-object state MUST NOT be mutable from outside the boundary. Expose behavior and read-only accessors only; external code MUST NOT assign status, replace internal collections, or construct invalid value objects.
+   - **Factory separation**: `create` initializes new aggregates only (e.g., `Draft`, `version = 0`, empty events) and MUST NOT accept post-transition state; `reconstitute` accepts persisted state (ID, status, version) and validates invariants.
+   - **Entity identity**: entity equality MUST be defined by identity (ID), not by all attributes. Value objects use attribute equality.
+   - **Value-object validation**: value objects MUST be immutable and self-validating; construction MUST NOT bypass invariant checks.
+   - **Domain-event lifecycle**: record events on the aggregate, pull/clear them after a successful `save`, and publish through an Application-layer `DomainEventPublisher` port. Mappers MUST NOT persist transient events. If events are intentionally record-only, the design MUST declare that policy explicitly.
+   - **Cross-aggregate consistency & compensation**: enforce one aggregate per transaction; external side effects require compensation (`releaseStock` / `refund`), idempotency keys, and use of the post-transition aggregate.
+   - **Optimistic concurrency**: aggregates carry a version and repositories reject stale saves with a conflict error.
    - `application/`: Split into `application/{services,ports,dtos}/<aggregate|shared>/` (`ports/` also holds external-context ports). UseCases accept Ports via DI, return `Result<T, E>`, and declare `@implements REQ-<CTX>-<NNN>`.
    - `infrastructure/`: Split strictly into:
      1. `infrastructure/drivers/<technology>/`: Raw I/O only (**NO `if`/`switch`/`match`/ternary logic allowed**).
@@ -26,6 +36,9 @@ Use this skill whenever designing, implementing, testing, or verifying changes i
    - Keep directory file counts <= `structure.maxFilesPerDirectory` (default 15; `ai-ddd verify` warns when exceeded).
 3. **Result<T, E> Error Handling**:
    - Model all expected domain and infrastructure failures as typed error values inside `Result<T, E>`. Reserve exceptions/panics solely for unrecoverable bugs.
+   - Separate `DomainError` (invariant violations) from `InfrastructureError` (storage/external failures); do not put infrastructure codes such as `REPOSITORY_ERROR` in the domain vocabulary.
+4. **Specification Language**:
+   - Specs MUST describe observable domain behavior in Ubiquitous Language and MUST NOT contain internal class names, error codes, framework names, SQL/HTTP details, or rendering technology.
 
 ## 2. Localization (Master = `en`)
 
@@ -50,7 +63,7 @@ Use this skill whenever designing, implementing, testing, or verifying changes i
    - Always assign `max(existing) + 1`; **never reuse retired IDs**.
 2. **Traceability Matrix & Check**:
    - Run `ai-ddd trace --target <dir>` to generate `docs/traceability/matrix.md` (do not hand-edit).
-   - `ai-ddd trace --target <dir> --check` (also run by `ai-ddd verify`) fails on: missing heading IDs, duplicate IDs, Scenarios without IT cases, Requirements without `@implements`, test cases without automated tests, or orphan ID references.
+   - `ai-ddd trace --target <dir> --check` (also run by `ai-ddd verify`) fails on: missing heading IDs, duplicate IDs, Scenarios without IT cases, Requirements without `@implements`, test cases without automated tests, orphan ID references, or missing Scenario ↔ Application UseCase 1-to-1 tests (a `UT-` case MUST reference exactly one Scenario; group multiple Scenarios only under `IT-`).
 
 ## 4. Test Planning, Test Specifications & C1 100% Governance
 
@@ -62,6 +75,9 @@ Use this skill whenever designing, implementing, testing, or verifying changes i
 - **Unit Test Specification (`docs/testing/unit/<layer>/<module>.md`)**:
   - Enumerate design elements, test design technique (boundary value, equivalence partitioning, state transition, error mapping, etc.), inputs, expected results, and rationale (`REQ`/`SCN`/design).
   - Every automated test MUST carry a `UT-` or `IT-` ID; coverage-only tests without a spec ID are rejected by `ai-ddd verify`.
+  - Model-integrity tests are mandatory: aggregate/value-object encapsulation, `create`/`reconstitute` separation, identity-based entity equality, value-object self-validation, and domain-event pull/publish/clear lifecycle.
+- **Model-Integrity Verification (`ai-ddd verify`)**:
+  - Fails on exposed aggregate/value-object fields, missing event dispatch or record-only declaration, and ubiquitous-language terms that do not map to domain identifiers. Heuristic checks can be disabled in project configuration when they produce false positives.
 - **100% C1 Branch Coverage Mandatory** outside authorized exclusions (`infrastructure/drivers/` and `main` only; zero inline ignore comments; branchless `drivers/`).
 - **Presentation Web UI Testing (Mock × Playwright)**:
   - Start the real Presentation HTTP server with DI-injected Mock UseCases inside the coverage-instrumented test process.
